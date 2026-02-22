@@ -6,21 +6,22 @@
 
 import re
 from dataclasses import dataclass
-from typing import List, Optional, Callable
-from urllib.parse import parse_qs, urlparse
+from typing import Callable, List, Optional
 
 
 @dataclass(frozen=True)
 class ParsedLink:
     """解析后的链接对象"""
-    original: str          # 原始链接/文本
-    normalized: str        # 标准化后的链接
-    video_id: str          # 提取的视频ID
-    link_type: str         # 原始类型: short, video, note, modal, text
+
+    original: str  # 原始链接/文本
+    normalized: str  # 标准化后的链接
+    video_id: str  # 提取的视频ID
+    link_type: str  # 原始类型: short, video, note, modal, text
 
 
 class URLParseError(Exception):
     """URL解析错误"""
+
     pass
 
 
@@ -28,7 +29,7 @@ class URLParseError(Exception):
 
 # 从文本中提取URL
 URL_PATTERN = re.compile(
-    r'https?://'           # http:// 或 https://
+    r'https?://'  # http:// 或 https://
     r'[^\s<>"{}|\\^`\[\]]+'  # 非空白和特殊字符
     r'[^\s<>"{}|\\^`\[\](),;.?!]'  # 不以标点结尾
 )
@@ -36,29 +37,19 @@ URL_PATTERN = re.compile(
 # 抖音域名模式
 DOUYIN_PATTERNS = {
     # 短链: https://v.douyin.com/xxxxx/
-    'short': re.compile(
-        r'https?://v\.douyin\.com/(?P<code>[a-zA-Z0-9_-]+)/?'
-    ),
+    'short': re.compile(r'https?://v\.douyin\.com/(?P<code>[a-zA-Z0-9_-]+)/?'),
     # 视频页: https://www.douyin.com/video/xxxxx
-    'video': re.compile(
-        r'https?://(?:www\.)?douyin\.com/video/(?P<id>\d+)'
-    ),
+    'video': re.compile(r'https?://(?:www\.)?douyin\.com/video/(?P<id>\d+)'),
     # 图文页: https://www.douyin.com/note/xxxxx
-    'note': re.compile(
-        r'https?://(?:www\.)?douyin\.com/note/(?P<id>\d+)'
-    ),
+    'note': re.compile(r'https?://(?:www\.)?douyin\.com/note/(?P<id>\d+)'),
     # 精选页: https://www.douyin.com/jingxuan?modal_id=xxxxx
-    'modal': re.compile(
-        r'https?://(?:www\.)?douyin\.com/\w+\?modal_id=(?P<id>\d+)'
-    ),
+    'modal': re.compile(r'https?://(?:www\.)?douyin\.com/\w+\?modal_id=(?P<id>\d+)'),
     # 移动端分享: https://m.douyin.com/share/video/xxxxx
-    'mobile': re.compile(
-        r'https?://m\.douyin\.com/share/video/(?P<id>\d+)'
-    ),
+    'mobile': re.compile(r'https?://m\.douyin\.com/share/video/(?P<id>\d+)'),
 }
 
 # 标准化视频页模板
-VIDEO_URL_TEMPLATE = "https://www.douyin.com/video/{video_id}"
+VIDEO_URL_TEMPLATE = 'https://www.douyin.com/video/{video_id}'
 
 
 def extract_urls_from_text(text: str) -> List[str]:
@@ -133,7 +124,7 @@ def parse_douyin_url(url: str) -> Optional[ParsedLink]:
                     original=url,
                     normalized=url,  # 暂时保持原样
                     video_id=match.group('code'),  # 短链code，不是真实ID
-                    link_type='short'
+                    link_type='short',
                 )
             else:
                 # 其他类型直接提取ID
@@ -142,7 +133,7 @@ def parse_douyin_url(url: str) -> Optional[ParsedLink]:
                     original=url,
                     normalized=VIDEO_URL_TEMPLATE.format(video_id=video_id),
                     video_id=video_id,
-                    link_type=link_type
+                    link_type=link_type,
                 )
 
     # 无法识别
@@ -150,8 +141,7 @@ def parse_douyin_url(url: str) -> Optional[ParsedLink]:
 
 
 def extract_douyin_links(
-    input_text: str,
-    short_link_resolver: Optional[Callable[[str], str]] = None
+    input_text: str, short_link_resolver: Optional[Callable[[str], str]] = None
 ) -> List[ParsedLink]:
     """
     从用户输入中提取抖音链接
@@ -222,10 +212,7 @@ def extract_douyin_links(
     return results
 
 
-def normalize_douyin_links(
-    input_text: str,
-    short_link_resolver: Optional[Callable[[str], str]] = None
-) -> List[str]:
+def normalize_douyin_links(input_text: str, short_link_resolver: Optional[Callable[[str], str]] = None) -> List[str]:
     """
     简化版：预处理并返回标准化链接列表
 
@@ -262,4 +249,4 @@ def format_link_for_display(parsed: ParsedLink) -> str:
         'mobile': '移动端',
     }
     type_name = type_names.get(parsed.link_type, '未知')
-    return f"视频ID: {parsed.video_id} ({type_name})"
+    return f'视频ID: {parsed.video_id} ({type_name})'

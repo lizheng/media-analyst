@@ -3,6 +3,7 @@
 
 纯函数：将 CrawlerRequest 转换为 MediaCrawler 命令行参数
 """
+
 from typing import List
 
 from media_analyst.core.models import CrawlerRequest
@@ -41,11 +42,11 @@ def build_command(request: CrawlerRequest, use_uv: bool = True) -> List[str]:
     """
     args = build_args(request)
     if use_uv:
-        return ["uv", "run", "main.py"] + args
-    return ["python", "main.py"] + args
+        return ['uv', 'run', 'main.py'] + args
+    return ['python', 'main.py'] + args
 
 
-def preview_command(request: CrawlerRequest, media_crawler_path: str = "../MediaCrawler") -> str:
+def preview_command(request: CrawlerRequest, media_crawler_path: str = '../MediaCrawler') -> str:
     """
     生成命令预览字符串（用于 UI 显示）
 
@@ -57,5 +58,5 @@ def preview_command(request: CrawlerRequest, media_crawler_path: str = "../Media
         可读的命令字符串
     """
     cmd = build_command(request)
-    cmd_str = " ".join(cmd)
-    return f"cd {media_crawler_path} && {cmd_str}"
+    cmd_str = ' '.join(cmd)
+    return f'cd {media_crawler_path} && {cmd_str}'

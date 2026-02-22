@@ -6,32 +6,34 @@ CrawlerRunner - 爬虫执行器
 - 轮询状态
 - 停止进程
 """
+
 import subprocess
 import time
-from datetime import datetime
 from pathlib import Path
-from typing import Iterator, List, Optional
+from typing import Iterator, Optional
 
 from media_analyst.core.models import (
     CrawlerExecution,
     CrawlerRequest,
-    ExecutionStatus,
 )
 from media_analyst.core.params import build_command
 
 
 class CrawlerRunnerError(Exception):
     """爬虫运行器错误"""
+
     pass
 
 
 class MediaCrawlerNotFoundError(CrawlerRunnerError):
     """MediaCrawler 路径不存在"""
+
     pass
 
 
 class ProcessError(CrawlerRunnerError):
     """进程操作错误"""
+
     pass
 
 
@@ -76,16 +78,12 @@ class CrawlerRunner:
 
         # 验证路径存在（立即失败原则）
         if not self.media_crawler_path.exists():
-            raise MediaCrawlerNotFoundError(
-                f"MediaCrawler 路径不存在: {self.media_crawler_path.absolute()}"
-            )
+            raise MediaCrawlerNotFoundError(f'MediaCrawler 路径不存在: {self.media_crawler_path.absolute()}')
 
         # 验证 main.py 存在
-        self.main_py = self.media_crawler_path / "main.py"
+        self.main_py = self.media_crawler_path / 'main.py'
         if not self.main_py.exists():
-            raise MediaCrawlerNotFoundError(
-                f"找不到 main.py: {self.main_py}"
-            )
+            raise MediaCrawlerNotFoundError(f'找不到 main.py: {self.main_py}')
 
         # 跟踪当前运行的进程
         self._current_process: Optional[subprocess.Popen] = None
@@ -107,7 +105,7 @@ class CrawlerRunner:
         """
         # 检查是否有进程在运行
         if self._current_process is not None and self._current_process.poll() is None:
-            raise CrawlerRunnerError("已有爬虫进程在运行，请先停止")
+            raise CrawlerRunnerError('已有爬虫进程在运行，请先停止')
 
         # 构建命令
         cmd = build_command(request, use_uv=self.use_uv)
@@ -126,9 +124,9 @@ class CrawlerRunner:
                 bufsize=1,  # 行缓冲
             )
         except FileNotFoundError as e:
-            raise ProcessError(f"找不到命令: {cmd[0]}。请确保已安装 uv") from e
+            raise ProcessError(f'找不到命令: {cmd[0]}。请确保已安装 uv') from e
         except Exception as e:
-            raise ProcessError(f"启动进程失败: {e}") from e
+            raise ProcessError(f'启动进程失败: {e}') from e
 
         # 更新状态
         execution.mark_running(process.pid)
@@ -153,7 +151,7 @@ class CrawlerRunner:
             return execution
 
         if self._current_process is None:
-            execution.mark_failed("进程未启动")
+            execution.mark_failed('进程未启动')
             return execution
 
         process = self._current_process
@@ -209,7 +207,7 @@ class CrawlerRunner:
             TimeoutError: 如果超时
         """
         if self._current_process is None:
-            raise ProcessError("进程未启动")
+            raise ProcessError('进程未启动')
 
         process = self._current_process
         start_time = time.time()
@@ -221,10 +219,10 @@ class CrawlerRunner:
                 elapsed = time.time() - start_time
                 if elapsed > timeout:
                     self.stop(execution)
-                    raise TimeoutError(f"执行超时（{timeout}秒）")
+                    raise TimeoutError(f'执行超时（{timeout}秒）')
 
             # 读取一行（阻塞直到有数据或进程结束）
-            line = process.stdout.readline() if process.stdout else ""
+            line = process.stdout.readline() if process.stdout else ''
 
             if line:
                 line = line.rstrip('\n')
@@ -241,7 +239,7 @@ class CrawlerRunner:
                         for err_line in stderr_remaining.split('\n'):
                             if err_line:
                                 execution.add_output(err_line, is_stderr=True)
-                                yield f"[stderr] {err_line}"
+                                yield f'[stderr] {err_line}'
 
                 execution.mark_completed(return_code)
                 self._current_process = None
@@ -305,7 +303,7 @@ class CrawlerRunner:
             return execution
 
         if self._current_process is None:
-            execution.mark_failed("进程未启动")
+            execution.mark_failed('进程未启动')
             return execution
 
         process = self._current_process

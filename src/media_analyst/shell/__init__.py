@@ -9,4 +9,4 @@ Shell - Imperative Shell
 
 from media_analyst.shell.runner import CrawlerRunner, CrawlerRunnerError
 
-__all__ = ["CrawlerRunner", "CrawlerRunnerError"]
+__all__ = ['CrawlerRunner', 'CrawlerRunnerError']

@@ -4,8 +4,6 @@
 验证从 core → ui 的完整导入链路
 """
 
-import pytest
-
 
 class TestImportChain:
     """测试各级导入链路"""
@@ -13,33 +11,25 @@ class TestImportChain:
     def test_import_from_url_parser_directly(self):
         """直接导入 url_parser 模块"""
         from media_analyst.core.url_parser import (
-            ParsedLink,
-            URLParseError,
-            extract_urls_from_text,
-            parse_douyin_url,
             extract_douyin_links,
-            normalize_douyin_links,
-            format_link_for_display,
+            extract_urls_from_text,
         )
+
         assert callable(extract_urls_from_text)
         assert callable(extract_douyin_links)
 
     def test_import_from_core_init(self):
         """从 core.__init__ 导入"""
         from media_analyst.core import (
-            ParsedLink,
-            URLParseError,
-            extract_urls_from_text,
-            parse_douyin_url,
             extract_douyin_links,
-            normalize_douyin_links,
-            format_link_for_display,
         )
+
         assert callable(extract_douyin_links)
 
     def test_import_format_link_for_display_from_core(self):
         """测试 format_link_for_display 是否能从core导入"""
         from media_analyst.core import format_link_for_display
+
         assert callable(format_link_for_display)
 
     def test_import_in_app_context(self):
@@ -49,6 +39,7 @@ class TestImportChain:
             extract_douyin_links,
             format_link_for_display,
         )
+
         assert callable(extract_douyin_links)
         assert callable(format_link_for_display)
 
@@ -70,10 +61,10 @@ class TestImportChain:
         from media_analyst.core import ParsedLink
 
         link = ParsedLink(
-            original="https://v.douyin.com/abc/",
-            normalized="https://www.douyin.com/video/123",
-            video_id="123",
-            link_type="short"
+            original='https://v.douyin.com/abc/',
+            normalized='https://www.douyin.com/video/123',
+            video_id='123',
+            link_type='short',
         )
-        assert link.video_id == "123"
-        assert link.link_type == "short"
+        assert link.video_id == '123'
+        assert link.link_type == 'short'

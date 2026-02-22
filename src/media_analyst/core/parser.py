@@ -15,7 +15,7 @@ JSON文件 -> detect_platform() -> parse_post/parse_comment() -> Post/Comment模
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Union
 
 from media_analyst.core.models import Comment, ParsedData, Platform, Post
 
@@ -25,13 +25,13 @@ from media_analyst.core.models import Comment, ParsedData, Platform, Post
 
 # 平台字段特征映射（用于自动检测）
 PLATFORM_SIGNATURES = {
-    Platform.DY: {"content_id_fields": ["aweme_id"], "user_id_fields": ["sec_uid"]},
-    Platform.XHS: {"content_id_fields": ["note_id"], "user_id_fields": ["user_id"]},
-    Platform.BILI: {"content_id_fields": ["bvid", "video_id"], "user_id_fields": ["mid", "owner_mid"]},
-    Platform.KS: {"content_id_fields": ["photo_id", "work_id"], "user_id_fields": ["user_id", "author_id"]},
-    Platform.WB: {"content_id_fields": ["mid", "weibo_id"], "user_id_fields": ["user_id", "uid"]},
-    Platform.TIEBA: {"content_id_fields": ["thread_id", "post_id"], "user_id_fields": ["user_id"]},
-    Platform.ZHIHU: {"content_id_fields": ["question_id", "answer_id"], "user_id_fields": ["id", "uid"]},
+    Platform.DY: {'content_id_fields': ['aweme_id'], 'user_id_fields': ['sec_uid']},
+    Platform.XHS: {'content_id_fields': ['note_id'], 'user_id_fields': ['user_id']},
+    Platform.BILI: {'content_id_fields': ['bvid', 'video_id'], 'user_id_fields': ['mid', 'owner_mid']},
+    Platform.KS: {'content_id_fields': ['photo_id', 'work_id'], 'user_id_fields': ['user_id', 'author_id']},
+    Platform.WB: {'content_id_fields': ['mid', 'weibo_id'], 'user_id_fields': ['user_id', 'uid']},
+    Platform.TIEBA: {'content_id_fields': ['thread_id', 'post_id'], 'user_id_fields': ['user_id']},
+    Platform.ZHIHU: {'content_id_fields': ['question_id', 'answer_id'], 'user_id_fields': ['id', 'uid']},
 }
 
 
@@ -58,16 +58,16 @@ def detect_platform(data: Dict[str, Any]) -> Optional[Platform]:
 
     # 优先检查评论特有字段（避免将评论误判为帖子）
     # 抖音评论有 comment_id 和 aweme_id，小红书评论有 comment_id 和 note_id
-    if "comment_id" in data_keys:
+    if 'comment_id' in data_keys:
         # 有 aweme_id 的是抖音评论，有 note_id 的是小红书评论
-        if "aweme_id" in data_keys:
+        if 'aweme_id' in data_keys:
             return Platform.DY
-        if "note_id" in data_keys:
+        if 'note_id' in data_keys:
             return Platform.XHS
 
     for platform, signatures in PLATFORM_SIGNATURES.items():
         # 检查内容ID字段
-        for field in signatures["content_id_fields"]:
+        for field in signatures['content_id_fields']:
             if field in data_keys:
                 return platform
 
@@ -87,18 +87,18 @@ def detect_platform_from_filename(filename: str) -> Optional[Platform]:
     filename_lower = filename.lower()
 
     platform_map = {
-        "douyin": Platform.DY,
-        "dy": Platform.DY,
-        "xiaohongshu": Platform.XHS,
-        "xhs": Platform.XHS,
-        "bilibili": Platform.BILI,
-        "bili": Platform.BILI,
-        "kuaishou": Platform.KS,
-        "ks": Platform.KS,
-        "weibo": Platform.WB,
-        "wb": Platform.WB,
-        "tieba": Platform.TIEBA,
-        "zhihu": Platform.ZHIHU,
+        'douyin': Platform.DY,
+        'dy': Platform.DY,
+        'xiaohongshu': Platform.XHS,
+        'xhs': Platform.XHS,
+        'bilibili': Platform.BILI,
+        'bili': Platform.BILI,
+        'kuaishou': Platform.KS,
+        'ks': Platform.KS,
+        'weibo': Platform.WB,
+        'wb': Platform.WB,
+        'tieba': Platform.TIEBA,
+        'zhihu': Platform.ZHIHU,
     }
 
     for key, platform in platform_map.items():
@@ -129,11 +129,11 @@ def extract_crawl_time_from_filename(filename: str) -> Optional[datetime]:
     base_name = Path(filename).stem
 
     # 模式1: _2024_0222_143052 (下划线分隔，紧凑格式)
-    pattern1 = r"_(\d{4})_?(\d{2})_?(\d{2})_?(\d{2})_?(\d{2})_?(\d{2})"
+    pattern1 = r'_(\d{4})_?(\d{2})_?(\d{2})_?(\d{2})_?(\d{2})_?(\d{2})'
     # 模式2: _2024-02-22-14-30-52 (横线分隔)
-    pattern2 = r"_(\d{4})-(\d{2})-(\d{2})-(\d{2})-(\d{2})-(\d{2})"
+    pattern2 = r'_(\d{4})-(\d{2})-(\d{2})-(\d{2})-(\d{2})-(\d{2})'
     # 模式3: _20240222_143052 (日期紧凑，时间下划线)
-    pattern3 = r"_(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})"
+    pattern3 = r'_(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})'
 
     for pattern in [pattern1, pattern2, pattern3]:
         match = re.search(pattern, base_name)
@@ -147,8 +147,8 @@ def extract_crawl_time_from_filename(filename: str) -> Optional[datetime]:
     # 只有日期的格式（没有时间部分）
     # 模式4: _2024-02-22 或 _2024_02_22
     date_patterns = [
-        r"_(\d{4})-(\d{2})-(\d{2})(?:\.|_|$)",  # _2024-02-22.json 或 _2024-02-22_
-        r"_(\d{4})_(\d{2})_(\d{2})(?:\.|_|$)",  # _2024_02_22.json
+        r'_(\d{4})-(\d{2})-(\d{2})(?:\.|_|$)',  # _2024-02-22.json 或 _2024-02-22_
+        r'_(\d{4})_(\d{2})_(\d{2})(?:\.|_|$)',  # _2024_02_22.json
     ]
     for pattern in date_patterns:
         match = re.search(pattern, base_name)
@@ -175,6 +175,7 @@ def extract_crawl_time_from_filename(filename: str) -> Optional[datetime]:
 # 字段提取器（平台特定）
 # =============================================================================
 
+
 def _get_field(data: Dict[str, Any], *field_names: str, default: Any = None) -> Any:
     """
     尝试从多个字段名中获取第一个存在的值
@@ -196,11 +197,11 @@ def _get_field(data: Dict[str, Any], *field_names: str, default: Any = None) -> 
 def _extract_common_fields(data: Dict[str, Any]) -> Dict[str, Any]:
     """提取各平台共通的字段"""
     return {
-        "user_id": _get_field(data, "user_id", "uid", "author_id", default=""),
-        "nickname": _get_field(data, "nickname", "user_name", "author_name", default=""),
-        "avatar": _get_field(data, "avatar", "avatar_url", "user_avatar", default=""),
-        "ip_location": _get_field(data, "ip_location", "ip_label", "location", default=""),
-        "source_keyword": _get_field(data, "source_keyword", "keyword", default=""),
+        'user_id': _get_field(data, 'user_id', 'uid', 'author_id', default=''),
+        'nickname': _get_field(data, 'nickname', 'user_name', 'author_name', default=''),
+        'avatar': _get_field(data, 'avatar', 'avatar_url', 'user_avatar', default=''),
+        'ip_location': _get_field(data, 'ip_location', 'ip_label', 'location', default=''),
+        'source_keyword': _get_field(data, 'source_keyword', 'keyword', default=''),
     }
 
 
@@ -208,38 +209,39 @@ def _extract_common_fields(data: Dict[str, Any]) -> Dict[str, Any]:
 # 平台特定解析器
 # =============================================================================
 
+
 def _parse_douyin_post(data: Dict[str, Any]) -> Post:
     """解析抖音帖子数据"""
     common = _extract_common_fields(data)
 
     # 构建媒体URL列表
     media_urls = []
-    video_url = data.get("video_download_url", "")
+    video_url = data.get('video_download_url', '')
     if video_url:
         media_urls.append(video_url)
-    note_urls = data.get("note_download_url", "")
+    note_urls = data.get('note_download_url', '')
     if note_urls:
-        media_urls.extend([url.strip() for url in note_urls.split(",") if url.strip()])
+        media_urls.extend([url.strip() for url in note_urls.split(',') if url.strip()])
 
     return Post(
-        content_id=_get_field(data, "aweme_id", default=""),
+        content_id=_get_field(data, 'aweme_id', default=''),
         platform=Platform.DY,
-        content_type="video" if video_url else "note",
-        title=data.get("title", ""),
-        desc=data.get("desc", ""),
-        content_url=data.get("aweme_url", ""),
-        cover_url=data.get("cover_url", ""),
+        content_type='video' if video_url else 'note',
+        title=data.get('title', ''),
+        desc=data.get('desc', ''),
+        content_url=data.get('aweme_url', ''),
+        cover_url=data.get('cover_url', ''),
         media_urls=media_urls,
-        create_time=data.get("create_time"),
-        last_modify_ts=data.get("last_modify_ts"),
-        sec_uid=data.get("sec_uid", ""),
-        short_user_id=data.get("short_user_id", ""),
-        user_unique_id=data.get("user_unique_id", ""),
-        user_signature=data.get("user_signature", ""),
-        liked_count=data.get("liked_count", 0),
-        collected_count=data.get("collected_count", 0),
-        comment_count=data.get("comment_count", 0),
-        share_count=data.get("share_count", 0),
+        create_time=data.get('create_time'),
+        last_modify_ts=data.get('last_modify_ts'),
+        sec_uid=data.get('sec_uid', ''),
+        short_user_id=data.get('short_user_id', ''),
+        user_unique_id=data.get('user_unique_id', ''),
+        user_signature=data.get('user_signature', ''),
+        liked_count=data.get('liked_count', 0),
+        collected_count=data.get('collected_count', 0),
+        comment_count=data.get('comment_count', 0),
+        share_count=data.get('share_count', 0),
         raw_data=data,
         **common,
     )
@@ -248,24 +250,24 @@ def _parse_douyin_post(data: Dict[str, Any]) -> Post:
 def _parse_douyin_comment(data: Dict[str, Any]) -> Comment:
     """解析抖音评论数据"""
     common = _extract_common_fields(data)
-    parent_id = data.get("parent_comment_id", "0")
+    parent_id = data.get('parent_comment_id', '0')
 
     return Comment(
-        comment_id=_get_field(data, "comment_id", "cid", default=""),
-        content_id=_get_field(data, "aweme_id", default=""),
+        comment_id=_get_field(data, 'comment_id', 'cid', default=''),
+        content_id=_get_field(data, 'aweme_id', default=''),
         platform=Platform.DY,
-        content=data.get("content", ""),
-        pictures=data.get("pictures", ""),
-        create_time=data.get("create_time"),
-        last_modify_ts=data.get("last_modify_ts"),
-        sec_uid=data.get("sec_uid", ""),
-        short_user_id=data.get("short_user_id", ""),
-        user_unique_id=data.get("user_unique_id", ""),
-        user_signature=data.get("user_signature"),
-        like_count=data.get("like_count", 0),
-        sub_comment_count=data.get("sub_comment_count", 0),
-        parent_comment_id=parent_id if parent_id != "0" else None,
-        is_sub_comment=parent_id is not None and parent_id != "0",
+        content=data.get('content', ''),
+        pictures=data.get('pictures', ''),
+        create_time=data.get('create_time'),
+        last_modify_ts=data.get('last_modify_ts'),
+        sec_uid=data.get('sec_uid', ''),
+        short_user_id=data.get('short_user_id', ''),
+        user_unique_id=data.get('user_unique_id', ''),
+        user_signature=data.get('user_signature'),
+        like_count=data.get('like_count', 0),
+        sub_comment_count=data.get('sub_comment_count', 0),
+        parent_comment_id=parent_id if parent_id != '0' else None,
+        is_sub_comment=parent_id is not None and parent_id != '0',
         raw_data=data,
         **common,
     )
@@ -277,31 +279,31 @@ def _parse_xhs_post(data: Dict[str, Any]) -> Post:
 
     # 构建媒体URL列表
     media_urls = []
-    video_url = data.get("video_url", "")
+    video_url = data.get('video_url', '')
     if video_url:
         media_urls.append(video_url)
-    image_urls = data.get("image_list", "")
+    image_urls = data.get('image_list', '')
     if image_urls:
-        media_urls.extend([url.strip() for url in image_urls.split(",") if url.strip()])
+        media_urls.extend([url.strip() for url in image_urls.split(',') if url.strip()])
 
     # 时间字段处理（小红书使用 time 字段，Unix 时间戳）
-    create_time = data.get("time")
+    create_time = data.get('time')
 
     return Post(
-        content_id=_get_field(data, "note_id", default=""),
+        content_id=_get_field(data, 'note_id', default=''),
         platform=Platform.XHS,
-        content_type=data.get("type", "unknown"),
-        title=data.get("title", ""),
-        desc=data.get("desc", ""),
-        content_url=data.get("note_url", ""),
-        cover_url="",  # 小红书没有单独的封面字段
+        content_type=data.get('type', 'unknown'),
+        title=data.get('title', ''),
+        desc=data.get('desc', ''),
+        content_url=data.get('note_url', ''),
+        cover_url='',  # 小红书没有单独的封面字段
         media_urls=media_urls,
         create_time=create_time,
-        last_modify_ts=data.get("last_modify_ts"),
-        liked_count=data.get("liked_count", 0),
-        collected_count=data.get("collected_count", 0),
-        comment_count=data.get("comment_count", 0),
-        share_count=data.get("share_count", 0),
+        last_modify_ts=data.get('last_modify_ts'),
+        liked_count=data.get('liked_count', 0),
+        collected_count=data.get('collected_count', 0),
+        comment_count=data.get('comment_count', 0),
+        share_count=data.get('share_count', 0),
         raw_data=data,
         **common,
     )
@@ -310,18 +312,18 @@ def _parse_xhs_post(data: Dict[str, Any]) -> Post:
 def _parse_xhs_comment(data: Dict[str, Any]) -> Comment:
     """解析小红书评论数据"""
     common = _extract_common_fields(data)
-    parent_id = data.get("parent_comment_id", 0)
+    parent_id = data.get('parent_comment_id', 0)
 
     return Comment(
-        comment_id=_get_field(data, "comment_id", "id", default=""),
-        content_id=_get_field(data, "note_id", default=""),
+        comment_id=_get_field(data, 'comment_id', 'id', default=''),
+        content_id=_get_field(data, 'note_id', default=''),
         platform=Platform.XHS,
-        content=data.get("content", ""),
-        pictures=data.get("pictures", ""),
-        create_time=data.get("create_time"),
-        last_modify_ts=data.get("last_modify_ts"),
-        like_count=data.get("like_count", 0),
-        sub_comment_count=data.get("sub_comment_count", 0),
+        content=data.get('content', ''),
+        pictures=data.get('pictures', ''),
+        create_time=data.get('create_time'),
+        last_modify_ts=data.get('last_modify_ts'),
+        like_count=data.get('like_count', 0),
+        sub_comment_count=data.get('sub_comment_count', 0),
         parent_comment_id=str(parent_id) if parent_id else None,
         is_sub_comment=parent_id is not None and parent_id != 0,
         raw_data=data,
@@ -333,22 +335,24 @@ def _parse_bilibili_post(data: Dict[str, Any]) -> Post:
     """解析B站视频数据"""
     common = _extract_common_fields(data)
 
+    # 覆盖 common 中的 user_id，使用 B 站特有的字段
+    common['user_id'] = _get_field(data, 'mid', 'owner_mid', default='')
+
     return Post(
-        content_id=_get_field(data, "bvid", "video_id", default=""),
+        content_id=_get_field(data, 'bvid', 'video_id', default=''),
         platform=Platform.BILI,
-        content_type="video",
-        title=data.get("title", ""),
-        desc=data.get("desc", ""),
-        content_url=data.get("video_url", ""),
-        cover_url=data.get("cover", ""),
-        media_urls=[data.get("video_url", "")] if data.get("video_url") else [],
-        create_time=data.get("create_time"),
-        last_modify_ts=data.get("last_modify_ts"),
-        user_id=_get_field(data, "mid", "owner_mid", default=""),
-        liked_count=data.get("like_count", 0),
-        collected_count=data.get("favorite_count", 0),
-        comment_count=data.get("comment_count", 0),
-        share_count=data.get("share_count", 0),
+        content_type='video',
+        title=data.get('title', ''),
+        desc=data.get('desc', ''),
+        content_url=data.get('video_url', ''),
+        cover_url=data.get('cover', ''),
+        media_urls=[data.get('video_url', '')] if data.get('video_url') else [],
+        create_time=data.get('create_time'),
+        last_modify_ts=data.get('last_modify_ts'),
+        liked_count=data.get('like_count', 0),
+        collected_count=data.get('favorite_count', 0),
+        comment_count=data.get('comment_count', 0),
+        share_count=data.get('share_count', 0),
         raw_data=data,
         **common,
     )
@@ -357,19 +361,21 @@ def _parse_bilibili_post(data: Dict[str, Any]) -> Post:
 def _parse_bilibili_comment(data: Dict[str, Any]) -> Comment:
     """解析B站评论数据"""
     common = _extract_common_fields(data)
-    parent_id = data.get("parent_comment_id", 0)
+    parent_id = data.get('parent_comment_id', 0)
+
+    # 覆盖 common 中的 user_id，使用 B 站特有的字段
+    common['user_id'] = _get_field(data, 'mid', 'member_id', default='')
 
     return Comment(
-        comment_id=_get_field(data, "comment_id", "rpid", default=""),
-        content_id=_get_field(data, "bvid", "video_id", default=""),
+        comment_id=_get_field(data, 'comment_id', 'rpid', default=''),
+        content_id=_get_field(data, 'bvid', 'video_id', default=''),
         platform=Platform.BILI,
-        content=data.get("content", ""),
-        pictures=data.get("pictures", []),
-        create_time=data.get("create_time"),
-        last_modify_ts=data.get("last_modify_ts"),
-        user_id=_get_field(data, "mid", "member_id", default=""),
-        like_count=data.get("like_count", 0),
-        sub_comment_count=data.get("reply_count", 0),
+        content=data.get('content', ''),
+        pictures=data.get('pictures', []),
+        create_time=data.get('create_time'),
+        last_modify_ts=data.get('last_modify_ts'),
+        like_count=data.get('like_count', 0),
+        sub_comment_count=data.get('reply_count', 0),
         parent_comment_id=str(parent_id) if parent_id else None,
         is_sub_comment=parent_id is not None and parent_id != 0,
         raw_data=data,
@@ -394,6 +400,7 @@ COMMENT_PARSERS: Dict[Platform, Callable[[Dict[str, Any]], Comment]] = {
 # =============================================================================
 # 公共解析接口
 # =============================================================================
+
 
 def parse_post(data: Dict[str, Any], platform: Optional[Platform] = None) -> Optional[Post]:
     """
@@ -470,17 +477,17 @@ def parse_json_file(file_path: Union[str, Path], deduplicate: bool = False) -> P
     path = Path(file_path)
 
     if not path.exists():
-        raise FileNotFoundError(f"文件不存在: {file_path}")
+        raise FileNotFoundError(f'文件不存在: {file_path}')
 
     # 读取并解析 JSON
-    with open(path, "r", encoding="utf-8") as f:
+    with open(path, 'r', encoding='utf-8') as f:
         data = json.load(f)
 
     # 确保是列表
     if isinstance(data, dict):
         data = [data]
     elif not isinstance(data, list):
-        raise ValueError(f"不支持的 JSON 格式: {type(data)}")
+        raise ValueError(f'不支持的 JSON 格式: {type(data)}')
 
     # 从文件名检测平台和抓取时间
     platform_from_name = detect_platform_from_filename(str(path))
@@ -496,7 +503,7 @@ def parse_json_file(file_path: Union[str, Path], deduplicate: bool = False) -> P
     # 解析每条记录
     for idx, record in enumerate(data):
         if not isinstance(record, dict):
-            errors.append(f"第 {idx + 1} 条记录不是字典类型")
+            errors.append(f'第 {idx + 1} 条记录不是字典类型')
             continue
 
         # 先尝试自动检测平台
@@ -504,7 +511,7 @@ def parse_json_file(file_path: Union[str, Path], deduplicate: bool = False) -> P
 
         # 根据字段特征判断是评论还是帖子
         # 评论通常有 comment_id 或 content + parent_comment_id
-        is_comment = "comment_id" in record or ("content" in record and "parent_comment_id" in record)
+        is_comment = 'comment_id' in record or ('content' in record and 'parent_comment_id' in record)
 
         if is_comment:
             # 尝试解析为评论
@@ -512,10 +519,12 @@ def parse_json_file(file_path: Union[str, Path], deduplicate: bool = False) -> P
             if comment:
                 # 添加抓取时间和源文件信息
                 if crawl_time or source_file:
-                    comment = comment.model_copy(update={
-                        "crawl_time": crawl_time,
-                        "source_file": source_file,
-                    })
+                    comment = comment.model_copy(
+                        update={
+                            'crawl_time': crawl_time,
+                            'source_file': source_file,
+                        }
+                    )
                 comments.append(comment)
                 if detected_platform is None:
                     detected_platform = comment.platform
@@ -526,17 +535,19 @@ def parse_json_file(file_path: Union[str, Path], deduplicate: bool = False) -> P
             if post:
                 # 添加抓取时间和源文件信息
                 if crawl_time or source_file:
-                    post = post.model_copy(update={
-                        "crawl_time": crawl_time,
-                        "source_file": source_file,
-                    })
+                    post = post.model_copy(
+                        update={
+                            'crawl_time': crawl_time,
+                            'source_file': source_file,
+                        }
+                    )
                 posts.append(post)
                 if detected_platform is None:
                     detected_platform = post.platform
                 continue
 
         # 都无法解析
-        errors.append(f"第 {idx + 1} 条记录无法识别平台或格式")
+        errors.append(f'第 {idx + 1} 条记录无法识别平台或格式')
 
     result = ParsedData(
         posts=posts,
@@ -582,7 +593,7 @@ def parse_json_files(file_paths: List[Union[str, Path]], deduplicate: bool = Tru
             if detected_platform is None and result.platform:
                 detected_platform = result.platform
         except Exception as e:
-            all_errors.append(f"{file_path}: {str(e)}")
+            all_errors.append(f'{file_path}: {str(e)}')
 
     merged_data = ParsedData(
         posts=all_posts,
@@ -605,6 +616,7 @@ def parse_json_files(file_paths: List[Union[str, Path]], deduplicate: bool = Tru
 # 数据导出
 # =============================================================================
 
+
 def posts_to_dataframe(posts: List[Post]) -> Any:
     """
     将 Post 列表转换为 pandas DataFrame
@@ -618,7 +630,7 @@ def posts_to_dataframe(posts: List[Post]) -> Any:
     try:
         import pandas as pd
     except ImportError:
-        raise ImportError("需要安装 pandas: uv add pandas")
+        raise ImportError('需要安装 pandas: uv add pandas')
 
     if not posts:
         return pd.DataFrame()
@@ -626,10 +638,12 @@ def posts_to_dataframe(posts: List[Post]) -> Any:
     # 转换为字典列表（排除 raw_data）
     data = []
     for post in posts:
-        d = post.model_dump(exclude={"raw_data"})
+        d = post.model_dump(exclude={'raw_data'})
         # 转换 datetime 为字符串
-        if d.get("create_time"):
-            d["create_time"] = d["create_time"].isoformat() if isinstance(d["create_time"], datetime) else d["create_time"]
+        if d.get('create_time'):
+            d['create_time'] = (
+                d['create_time'].isoformat() if isinstance(d['create_time'], datetime) else d['create_time']
+            )
         data.append(d)
 
     return pd.DataFrame(data)
@@ -648,7 +662,7 @@ def comments_to_dataframe(comments: List[Comment]) -> Any:
     try:
         import pandas as pd
     except ImportError:
-        raise ImportError("需要安装 pandas: uv add pandas")
+        raise ImportError('需要安装 pandas: uv add pandas')
 
     if not comments:
         return pd.DataFrame()
@@ -656,10 +670,12 @@ def comments_to_dataframe(comments: List[Comment]) -> Any:
     # 转换为字典列表（排除 raw_data）
     data = []
     for comment in comments:
-        d = comment.model_dump(exclude={"raw_data"})
+        d = comment.model_dump(exclude={'raw_data'})
         # 转换 datetime 为字符串
-        if d.get("create_time"):
-            d["create_time"] = d["create_time"].isoformat() if isinstance(d["create_time"], datetime) else d["create_time"]
+        if d.get('create_time'):
+            d['create_time'] = (
+                d['create_time'].isoformat() if isinstance(d['create_time'], datetime) else d['create_time']
+            )
         data.append(d)
 
     return pd.DataFrame(data)

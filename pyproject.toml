@@ -18,6 +18,8 @@ dev = [
     "pytest>=8.0.0",
     "pytest-timeout>=2.2.0",
     "pytest-asyncio>=0.23.0",
+    "pytest-cov>=4.1.0",
+    "ruff>=0.9.0",
 ]
 
 [build-system]
@@ -50,3 +52,63 @@ markers = [
 
 [tool.pytest-timeout]
 timeout = 300  # 5分钟超时，允许扫码
+
+[tool.coverage.run]
+source = ["src/media_analyst"]
+omit = [
+    "*/tests/*",
+    "*/test_*.py",
+    "*/__pycache__/*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+]
+precision = 1
+show_missing = true
+skip_covered = false
+
+[tool.coverage.html]
+directory = "htmlcov"
+title = "Media Analyst Coverage Report"
+
+[tool.ruff]
+target-version = "py313"
+line-length = 120
+indent-width = 4
+src = ["src", "tests"]
+extend-exclude = [
+    ".git",
+    ".venv",
+    "__pycache__",
+    "build",
+    "dist",
+    "htmlcov",
+    ".pytest_cache",
+    "*.egg-info",
+]
+
+[tool.ruff.format]
+quote-style = "single"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "F",   # Pyflakes
+    "I",   # isort
+]
+ignore = [
+    "E501",  # line too long (由 formatter 处理)
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"

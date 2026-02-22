@@ -1,0 +1,31 @@
+# Prek 配置文件（兼容 pre-commit 格式）
+# 文档: https://github.com/j178/prek
+# 安装 hooks: prek install
+# 手动运行: prek run --all-files
+
+repos:
+  # Ruff linter - 自动修复问题
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.9.0
+    hooks:
+      - id: ruff
+        name: Ruff Linter
+        args: [--fix]
+        stages: [pre-commit]
+
+  # Ruff formatter - 格式化代码
+      - id: ruff-format
+        name: Ruff Formatter
+        stages: [pre-commit]
+
+  # 本地 pytest 测试（排除 real_crawler）
+  - repo: local
+    hooks:
+      - id: pytest-check
+        name: Run pytest (unit + integration + ui)
+        entry: uv run pytest tests/unit tests/integration tests/ui -v
+        language: system
+        types: [python]
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit]

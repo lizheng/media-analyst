@@ -21,6 +21,66 @@ uv add <package>
 uv sync
 ```
 
+### Linting & Formatting
+
+项目使用 **Ruff** 进行代码 linting 和格式化（替代 black + isort + flake8）：
+
+```bash
+# 检查代码（从项目根目录运行，自动排除 .venv/ 等目录）
+uv run ruff check .
+
+# 自动修复可修复的问题
+uv run ruff check . --fix
+
+# 格式化代码
+uv run ruff format .
+
+# 检查格式化（不修改文件）
+uv run ruff format --check .
+```
+
+**Ruff 配置**（`pyproject.toml`）：
+- 行长度: 120 字符
+- Python 目标版本: 3.13
+- 引号风格: 单引号
+- 启用规则: `E` (pycodestyle), `F` (Pyflakes), `I` (isort)
+
+### Git Hooks (Prek)
+
+项目使用 **prek** 作为 Git pre-commit hook，在提交前自动运行代码检查和测试：
+
+```bash
+# 安装 prek（首次）
+uv tool install prek
+
+# 安装 git hooks（项目初始化时）
+prek install
+
+# 查看已配置的 hooks
+prek list
+
+# 手动运行所有 hooks
+prek run --all-files
+
+# 仅运行特定 hook
+prek run ruff --all-files
+
+# 跳过 hooks（紧急情况）
+git commit --no-verify -m "hotfix"
+```
+
+**prek 配置**（`.pre-commit-config.yaml`）：
+- **Ruff Linter**: 自动修复代码问题
+- **Ruff Formatter**: 格式化代码
+- **Pytest**: 运行单元测试、集成测试和 UI 测试
+
+**为什么使用 prek？**
+- prek 是用 Rust 重写的 pre-commit，完全兼容其配置格式
+- 速度更快，单二进制文件无额外依赖
+- 原生支持并行执行和 uv 集成
+
+> **注意**: prek 不是 Python 依赖，需要通过 `uv tool install` 单独安装。
+
 ## Architecture
 
 This is a **Streamlit-based web UI wrapper** around the [MediaCrawler](https://github.com/NanmiCoder/MediaCrawler) project.
@@ -138,16 +198,21 @@ class CreatorRequest(BaseModel):
 ### Key Components
 
 **src/media_analyst/core/** - Functional Core (pure functions, no side effects)
-- `models.py` - Pydantic data models (SearchRequest, DetailRequest, CreatorRequest, CrawlerExecution)
+- `models.py` - Pydantic data models
+  - Crawler: `SearchRequest`, `DetailRequest`, `CreatorRequest`, `CrawlerExecution`
+  - Parser: `Post`, `Comment`, `ParsedData` (解析结果模型)
 - `params.py` - Pure functions for building CLI arguments
 - `config.py` - Constants and mappings
 - `url_parser.py` - Douyin URL extraction and normalization (pure functions)
+- `parser.py` - Data parser (自动检测平台、去重处理)
 
 **src/media_analyst/shell/** - Imperative Shell (side effects)
 - `runner.py` - CrawlerRunner class for process management (subprocess)
 
 **src/media_analyst/ui/** - Streamlit UI
 - `app.py` - Main application with form builders and execution logic
+- `parser_page.py` - Data parser page (读取-解析-预览)
+- `persistence.py` - User preferences and path management (统一管理 MediaCrawler 路径)
 
 ### Data Flow
 
@@ -162,6 +227,27 @@ UI 显示 ← CrawlerExecution ← CrawlerRunner ← subprocess.Popen
 3. `request.to_cli_args()` generates CLI arguments (pure function)
 4. `CrawlerRunner.start(request)` spawns subprocess: `uv run main.py [args]`
 5. `CrawlerExecution` tracks process state, stdout/stderr, and output files
+
+### Data Parsing
+
+The application includes a separate data parsing page (`parser_page.py`) for parsing crawled JSON data:
+
+**Features:**
+- Accept directory input (recursively finds all `.json` files)
+- Auto-detect platform from filename and content
+- Deduplication (keeps latest crawl based on filename timestamp)
+- Preview parsed data in tables
+
+**Deduplication Strategy:**
+```python
+# Post: (platform, content_id) as unique key
+# Comment: (platform, comment_id) as unique key
+# Keep the one with latest crawl_time
+```
+
+**Crawl Time Extraction:**
+- Extracted from filename: `douyin_contents_2024_0221_143052.json` → `2024-02-21 14:30:52`
+- Fallback to file modification time
 
 ### URL Parsing (Douyin)
 
@@ -200,12 +286,33 @@ links = extract_douyin_links(text, short_link_resolver=resolve_short_link)
 
 ### External Dependency
 
-The application **requires MediaCrawler to be installed separately** at a hardcoded path:
+### MediaCrawler Path Configuration
+
+The application uses a **unified path management** system via `persistence.py`:
+
+**Path Resolution Priority:**
+1. User saved path (stored in `~/.media_analyst/preferences.json`)
+2. Auto-detected path (multiple strategies)
+3. Default: `../MediaCrawler` (relative to working directory)
+
+**Auto-detection Strategies:**
+- Current working directory relative (`../MediaCrawler`)
+- Based on `__file__` location
+- CWD parents traversal
+- Common absolute paths (`~/MediaCrawler`, `~/projects/MediaCrawler`)
+
+**Usage:**
 ```python
-MEDIA_CRAWLER_PATH = Path("../MediaCrawler")
+from media_analyst.ui.persistence import get_media_crawler_path
+
+# Get path (auto-resolves using priority above)
+mc_path = get_media_crawler_path()
+
+# Save custom path
+save_media_crawler_path("/path/to/MediaCrawler")
 ```
 
-This path is used as the working directory when spawning the crawler subprocess. If MediaCrawler is not present at this location, the application will fail at runtime.
+Both the crawler page and parser page use this unified configuration.
 
 ### Supported Platforms
 
@@ -233,7 +340,7 @@ tests/
 - 📦 **独立**：每个测试不依赖外部状态
 
 ```bash
-# 运行单元测试（40个，<1秒）
+# 运行单元测试（~160个，<1秒）
 uv run pytest tests/unit -v
 ```
 
@@ -242,7 +349,12 @@ uv run pytest tests/unit -v
 - `build_args()` 纯函数
 - `to_cli_args()` 方法
 - 模型序列化/反序列化
-- URL 解析（`extract_douyin_links`, `parse_douyin_url`）- 支持多种抖音链接格式
+- URL 解析（`extract_douyin_links`, `parse_douyin_url`）
+- 数据解析（`parse_json_file`, `parse_json_files`）
+- 去重逻辑（`deduplicate`, `deduplication_stats`）
+- 真实数据格式测试（使用 MediaCrawler 实际输出格式）
+- CLI 入口测试
+- 偏好持久化测试
 
 **示例**（纯函数测试）：
 ```python
@@ -265,9 +377,15 @@ def test_build_args_is_pure():
 - ⚡ 快速执行（无需真实爬虫）
 
 ```bash
-# 运行集成测试（14个）
+# 运行集成测试（~20个）
 uv run pytest tests/integration -v
 ```
+
+测试覆盖：
+- Runner 初始化和验证
+- 进程启动和停止
+- 输出捕获和超时处理
+- 错误处理（FileNotFoundError, PermissionError 等）
 
 ### 3. UI 测试 (`tests/ui/`)
 
@@ -279,9 +397,16 @@ uv run pytest tests/integration -v
 - 🔗 连接用户操作与 Core 层
 
 ```bash
-# 运行UI测试（13个）
+# 运行UI测试（~80个）
 uv run pytest tests/ui -v
 ```
+
+**测试覆盖**：
+- 主应用页面加载和交互
+- 数据解析页面功能
+- 各爬虫模式的表单渲染
+- `build_request()` 输出验证
+- 侧边栏配置组件
 
 **关键测试**：验证 UI 输出正确的模型类型
 ```python
@@ -307,10 +432,72 @@ uv run pytest tests/real_crawler -v -s
 ```
 
 ### 测试配置
-- 测试框架: `pytest` + `pytest-timeout` + `pytest-asyncio`
+- 测试框架: `pytest` + `pytest-timeout` + `pytest-asyncio` + `pytest-cov`
 - 超时设置: 5分钟（允许扫码和爬取）
 - 测试目录: `tests/`
 - 标记: `real_crawler`（真实爬虫）, `human_interaction`（需人工介入）, `slow`（执行慢）
+
+### 覆盖率测试
+
+**当前覆盖率**（261 个测试）：
+
+| 模块 | 覆盖率 | 说明 |
+|------|--------|------|
+| `core/models.py` | 94.9% | Pydantic 模型验证 |
+| `core/params.py` | 100% | 纯函数 CLI 参数构建 |
+| `core/parser.py` | 91.4% | 数据解析和平台检测 |
+| `core/url_parser.py` | 98.5% | URL 提取和标准化 |
+| `core/config.py` | 100% | 配置常量 |
+| `shell/runner.py` | 93.8% | 进程管理 |
+| `ui/persistence.py` | 95.1% | 偏好持久化 |
+| `ui/app.py` | 57.0% | 主应用界面 |
+| `ui/parser_page.py` | 47.3% | 数据解析页面 |
+| `cli.py` | 100% | CLI 入口 |
+| **整体** | **81.3%** | 总计 1414 语句 |
+
+使用 `pytest-cov` 进行测试覆盖率统计：
+
+```bash
+# 运行所有测试并显示覆盖率报告
+uv run pytest tests/unit tests/integration tests/ui --cov --cov-report=term
+
+# 生成 HTML 覆盖率报告（详细到每一行）
+uv run pytest tests/unit tests/integration tests/ui --cov --cov-report=html
+
+# 查看 HTML 报告
+open htmlcov/index.html
+
+# 仅查看未覆盖的代码行
+uv run pytest tests/unit tests/integration tests/ui --cov --cov-report=term-missing
+
+# 指定覆盖率阈值（低于此值会失败）
+uv run pytest tests/unit tests/integration tests/ui --cov --cov-fail-under=80
+```
+
+**覆盖率配置**（在 `pyproject.toml` 中）：
+- 统计范围：`src/media_analyst/` 目录下的源代码
+- 排除项：测试文件、`__pycache__`、TYPE_CHECKING 代码块
+- HTML 报告输出到 `htmlcov/` 目录
+
+### 测试文件组织
+
+```
+tests/
+├── unit/                      # 单元测试（纯函数，无需 Mock）
+│   ├── test_core_models.py    # Pydantic 模型测试（44个）
+│   ├── test_params.py         # CLI 参数构建测试
+│   ├── test_parser.py         # 数据解析测试（53个）
+│   ├── test_url_parser.py     # URL 解析测试
+│   ├── test_persistence.py    # 偏好持久化测试（29个）
+│   └── test_cli.py            # CLI 入口测试（9个）
+├── integration/               # 集成测试（Mock 副作用）
+│   └── test_runner.py         # CrawlerRunner 测试（21个）
+├── ui/                        # UI 测试（AppTest）
+│   ├── test_streamlit.py      # 主应用测试（29个）
+│   └── test_parser_page.py    # 解析页面测试（19个）
+└── real_crawler/              # 端到端测试（慢速）
+    └── test_real_crawler.py
+```
 
 ### 测试编写规范
 
@@ -318,14 +505,21 @@ uv run pytest tests/real_crawler -v -s
 2. **按主题分文件**：一个测试文件一个主题（如 test_core_models.py）
 3. **使用注释分组**：用 `===` 分隔不同主题的测试
 4. **命名清晰**：`test_<被测对象>_<场景>_<预期结果>`
+5. **分层测试**：
+   - Core 层测试：直接调用纯函数，无需 Mock
+   - Shell 层测试：使用 `unittest.mock.patch` 模拟 IO
+   - UI 层测试：使用 `streamlit.testing.v1.AppTest`
 
 ## Development Notes
 
-- Python version: 3.14+ (specified in `.python-version`)
+- Python version: 3.13+ (specified in `.python-version`)
 - Package manager: `uv` with Tsinghua PyPI mirror configured
 - Project layout: `src/` layout (modern Python packaging)
 - Architecture: Functional Core, Imperative Shell (FCIS)
 - Design Principle: Make Illegal States Unrepresentable (MISM)
+- Multi-page app: `app.py` (crawler) + `parser_page.py` (data parsing)
+- Unified path config: `persistence.py` manages MediaCrawler path
+- Git hooks: **prek** for pre-commit checks (Ruff + Pytest)
 - The TODO.md tracks known issues: logging cleanup, button states, speed optimization, and UI state persistence
 
 ## Key Insights
@@ -363,7 +557,24 @@ Pydantic 模型在代码中充当**数据契约**：
 
 各层之间通过强类型模型交互，避免隐式字典传递。
 
-### 3. 测试即架构验证
+### 3. 测试覆盖率提升策略
+
+**测试作为质量保障**：
+- 新增功能必须配套测试
+- Bug 修复先写重现测试，再修复代码
+- 覆盖率报告作为 PR 审查参考
+
+**分层覆盖策略**：
+- **Core 层**：追求 95%+ 覆盖率（纯函数易于测试）
+- **Shell 层**：追求 90%+ 覆盖率（Mock 副作用）
+- **UI 层**：覆盖关键用户流程（表单提交、状态转换）
+
+**难以测试的代码是设计问题的信号**：
+- 如果测试难以编写，说明耦合度过高
+- 考虑重构以提高可测试性
+- 遵循 FCIS 架构分离纯函数和副作用
+
+### 4. 测试即架构验证
 
 测试结构直接反映架构分层：
 - `tests/unit/` → Core 层（纯函数）

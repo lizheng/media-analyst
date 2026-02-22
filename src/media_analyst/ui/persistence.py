@@ -5,37 +5,37 @@ UI选项持久化模块
 """
 
 import json
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
 import streamlit as st
 
 # 配置文件路径
-CONFIG_DIR = Path.home() / ".media_analyst"
-PREFS_FILE = CONFIG_DIR / "preferences.json"
+CONFIG_DIR = Path.home() / '.media_analyst'
+PREFS_FILE = CONFIG_DIR / 'preferences.json'
 
 
 @dataclass
 class UserPreferences:
     """用户偏好设置"""
 
-    platform: str = "dy"  # 默认抖音
-    login_type: str = "qrcode"  # 默认扫码登录
-    crawler_type: str = "search"  # 默认搜索模式
-    save_option: str = "csv"  # 默认CSV格式
-    save_path: str = ""  # 保存路径
+    platform: str = 'dy'  # 默认抖音
+    login_type: str = 'qrcode'  # 默认扫码登录
+    crawler_type: str = 'search'  # 默认搜索模式
+    save_option: str = 'csv'  # 默认CSV格式
+    save_path: str = ''  # 保存路径
     max_comments: int = 100  # 默认100条评论
     get_comment: bool = False  # 默认不获取评论
     get_sub_comment: bool = False  # 默认不获取子评论
     headless: bool = True  # 默认无头模式
-    media_crawler_path: str = ""  # MediaCrawler 根目录路径（用户自定义）
+    media_crawler_path: str = ''  # MediaCrawler 根目录路径（用户自定义）
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "UserPreferences":
+    def from_dict(cls, data: dict[str, Any]) -> 'UserPreferences':
         # 只保留有效的字段
         valid_fields = {k: v for k, v in data.items() if k in cls.__dataclass_fields__}
         return cls(**valid_fields)
@@ -54,13 +54,13 @@ def load_preferences() -> UserPreferences:
         UserPreferences对象，如果文件不存在则返回默认值
     """
     # 首先检查session_state（当前会话已加载）
-    if "_user_preferences" in st.session_state:
+    if '_user_preferences' in st.session_state:
         return UserPreferences.from_dict(st.session_state._user_preferences)
 
     # 从文件加载
     if PREFS_FILE.exists():
         try:
-            with open(PREFS_FILE, "r", encoding="utf-8") as f:
+            with open(PREFS_FILE, 'r', encoding='utf-8') as f:
                 data = json.load(f)
             prefs = UserPreferences.from_dict(data)
             st.session_state._user_preferences = prefs.to_dict()
@@ -90,11 +90,11 @@ def save_preferences(preferences: UserPreferences) -> None:
     # 保存到文件
     try:
         _ensure_config_dir()
-        with open(PREFS_FILE, "w", encoding="utf-8") as f:
+        with open(PREFS_FILE, 'w', encoding='utf-8') as f:
             json.dump(prefs_dict, f, ensure_ascii=False, indent=2)
     except IOError as e:
         # 保存失败时记录错误但不中断流程
-        st.warning(f"⚠️ 无法保存偏好设置: {e}")
+        st.warning(f'⚠️ 无法保存偏好设置: {e}')
 
 
 def save_from_form_values(
@@ -106,8 +106,8 @@ def save_from_form_values(
     get_comment: bool,
     get_sub_comment: bool,
     headless: bool,
-    save_path: str = "",
-    media_crawler_path: str = "",
+    save_path: str = '',
+    media_crawler_path: str = '',
 ) -> None:
     """
     从表单值创建并保存偏好
@@ -163,7 +163,7 @@ def get_preference(
 def clear_preferences() -> None:
     """清除所有保存的偏好设置"""
     # 清除session_state
-    keys_to_clear = ["_user_preferences"]
+    keys_to_clear = ['_user_preferences']
     for key in keys_to_clear:
         if key in st.session_state:
             del st.session_state[key]
@@ -185,6 +185,7 @@ def get_prefs_file_path() -> Path:
 # MediaCrawler 路径管理
 # =============================================================================
 
+
 def _find_media_crawler_paths() -> list[Path]:
     """
     自动查找可能的 MediaCrawler 路径
@@ -194,7 +195,7 @@ def _find_media_crawler_paths() -> list[Path]:
     candidates = []
 
     # 1. 当前工作目录的相对路径（首选项）
-    cwd_relative = Path("../MediaCrawler").resolve()
+    cwd_relative = Path('../MediaCrawler').resolve()
     candidates.append(cwd_relative)
 
     # 2. 基于当前文件位置（media-analyst/src/media_analyst/ui/persistence.py）
@@ -202,8 +203,8 @@ def _find_media_crawler_paths() -> list[Path]:
         current_file = Path(__file__).resolve()
         # 向上回溯到 media-analyst 目录的父目录，查找 MediaCrawler
         for parent in current_file.parents:
-            if parent.name == "media-analyst":
-                sibling_path = parent.parent / "MediaCrawler"
+            if parent.name == 'media-analyst':
+                sibling_path = parent.parent / 'MediaCrawler'
                 if sibling_path not in candidates:
                     candidates.append(sibling_path)
                 break
@@ -213,17 +214,17 @@ def _find_media_crawler_paths() -> list[Path]:
     # 3. 基于当前工作目录向上查找
     cwd = Path.cwd()
     for parent in [cwd] + list(cwd.parents)[:3]:  # 最多向上3层
-        candidate = parent / "MediaCrawler"
+        candidate = parent / 'MediaCrawler'
         if candidate not in candidates:
             candidates.append(candidate)
 
     # 4. 常见开发路径
     home = Path.home()
     common_paths = [
-        home / "workspace" / "MediaCrawler",
-        home / "Documents" / "workspace" / "MediaCrawler",
-        home / "Projects" / "MediaCrawler",
-        home / "media-analyst" / ".." / "MediaCrawler",
+        home / 'workspace' / 'MediaCrawler',
+        home / 'Documents' / 'workspace' / 'MediaCrawler',
+        home / 'Projects' / 'MediaCrawler',
+        home / 'media-analyst' / '..' / 'MediaCrawler',
     ]
     for path in common_paths:
         resolved = path.resolve()
@@ -243,7 +244,7 @@ def find_media_crawler_path() -> Path | None:
     for candidate in _find_media_crawler_paths():
         if candidate.exists() and candidate.is_dir():
             # 验证是否是 MediaCrawler（检查特征文件/目录）
-            if (candidate / "main.py").exists() or (candidate / "config").exists():
+            if (candidate / 'main.py').exists() or (candidate / 'config').exists():
                 return candidate
     return None
 
@@ -277,7 +278,7 @@ def get_media_crawler_path() -> Path:
         return found
 
     # 3. 返回默认路径（当前工作目录相对路径）
-    return Path("../MediaCrawler").resolve()
+    return Path('../MediaCrawler').resolve()
 
 
 def save_media_crawler_path(path: str | Path) -> bool:
@@ -299,7 +300,7 @@ def save_media_crawler_path(path: str | Path) -> bool:
         return False
 
     # 验证目录有效性（至少包含 main.py 或 config 目录）
-    if not (path_obj / "main.py").exists() and not (path_obj / "config").exists():
+    if not (path_obj / 'main.py').exists() and not (path_obj / 'config').exists():
         return False
 
     # 保存相对路径（如果可能）

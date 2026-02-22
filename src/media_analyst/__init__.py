@@ -7,41 +7,41 @@ Functional Core, Imperative Shell 架构：
 - ui: Streamlit 界面
 """
 
+from media_analyst.core.config import CRAWLER_TYPES, LOGIN_TYPES, PLATFORMS, SAVE_OPTIONS
 from media_analyst.core.models import (
-    CrawlerRequest,
-    SearchRequest,
-    DetailRequest,
-    CreatorRequest,
     CrawlerExecution,
-    ExecutionStatus,
-    Platform,
-    LoginType,
+    CrawlerRequest,
     CrawlerType,
+    CreatorRequest,
+    DetailRequest,
+    ExecutionStatus,
+    LoginType,
+    Platform,
     SaveOption,
+    SearchRequest,
 )
-from media_analyst.core.config import PLATFORMS, LOGIN_TYPES, CRAWLER_TYPES, SAVE_OPTIONS
 from media_analyst.shell.runner import CrawlerRunner
 
-__version__ = "0.2.0"
+__version__ = '0.2.0'
 
 __all__ = [
     # Models
-    "CrawlerRequest",
-    "SearchRequest",
-    "DetailRequest",
-    "CreatorRequest",
-    "CrawlerExecution",
-    "ExecutionStatus",
+    'CrawlerRequest',
+    'SearchRequest',
+    'DetailRequest',
+    'CreatorRequest',
+    'CrawlerExecution',
+    'ExecutionStatus',
     # Enums
-    "Platform",
-    "LoginType",
-    "CrawlerType",
-    "SaveOption",
+    'Platform',
+    'LoginType',
+    'CrawlerType',
+    'SaveOption',
     # Config
-    "PLATFORMS",
-    "LOGIN_TYPES",
-    "CRAWLER_TYPES",
-    "SAVE_OPTIONS",
+    'PLATFORMS',
+    'LOGIN_TYPES',
+    'CRAWLER_TYPES',
+    'SAVE_OPTIONS',
     # Shell
-    "CrawlerRunner",
+    'CrawlerRunner',
 ]
