@@ -30,6 +30,10 @@ from media_analyst.core import (
 )
 from media_analyst.core.params import preview_command
 from media_analyst.shell import CrawlerRunner, CrawlerRunnerError
+from media_analyst.ui.persistence import (
+    load_preferences,
+    save_from_form_values,
+)
 
 # 页面配置
 st.set_page_config(
@@ -49,26 +53,44 @@ def render_sidebar() -> dict:
     Returns:
         包含通用配置的字典
     """
+    # 加载用户偏好（用于设置默认值）
+    prefs = load_preferences()
+
+    # 计算各选项的索引
+    platform_options = list(PLATFORMS.keys())
+    platform_index = platform_options.index(prefs.platform) if prefs.platform in platform_options else 0
+
+    login_options = list(LOGIN_TYPES.keys())
+    login_index = login_options.index(prefs.login_type) if prefs.login_type in login_options else 0
+
+    crawler_options = list(CRAWLER_TYPES.keys())
+    crawler_index = crawler_options.index(prefs.crawler_type) if prefs.crawler_type in crawler_options else 0
+
+    save_index = SAVE_OPTIONS.index(prefs.save_option) if prefs.save_option in SAVE_OPTIONS else 0
+
     with st.sidebar:
         st.header("⚙️ 基础配置")
 
         platform = st.selectbox(
             "选择平台",
-            options=list(PLATFORMS.keys()),
+            options=platform_options,
+            index=platform_index,
             format_func=lambda x: f"{x} - {PLATFORMS[x]}",
             help="选择要爬取的平台",
         )
 
         login_type = st.selectbox(
             "登录方式",
-            options=list(LOGIN_TYPES.keys()),
+            options=login_options,
+            index=login_index,
             format_func=lambda x: LOGIN_TYPES[x],
             help="选择登录方式",
         )
 
         crawler_type = st.selectbox(
             "爬虫类型",
-            options=list(CRAWLER_TYPES.keys()),
+            options=crawler_options,
+            index=crawler_index,
             format_func=lambda x: CRAWLER_TYPES[x],
             help="选择爬取模式",
         )
@@ -79,12 +101,13 @@ def render_sidebar() -> dict:
         save_option = st.selectbox(
             "保存格式",
             options=SAVE_OPTIONS,
-            index=0,
+            index=save_index,
             help="数据保存格式",
         )
 
         save_path = st.text_input(
             "保存路径 (可选)",
+            value=prefs.save_path,
             placeholder="默认: MediaCrawler/data/",
             help="自定义数据保存路径，留空使用默认路径",
         )
@@ -93,17 +116,17 @@ def render_sidebar() -> dict:
             "单篇最大评论数",
             min_value=0,
             max_value=10000,
-            value=100,
+            value=prefs.max_comments,
             help="每篇笔记/视频获取的最大评论数，0表示不限制",
         )
 
         col1, col2 = st.columns(2)
         with col1:
-            get_comment = st.checkbox("获取评论", value=False)
+            get_comment = st.checkbox("获取评论", value=prefs.get_comment)
         with col2:
-            get_sub_comment = st.checkbox("获取子评论", value=False)
+            get_sub_comment = st.checkbox("获取子评论", value=prefs.get_sub_comment)
 
-        headless = st.checkbox("无头模式", value=True, help="后台运行浏览器（不显示窗口）")
+        headless = st.checkbox("无头模式", value=prefs.headless, help="后台运行浏览器（不显示窗口）")
 
     return {
         "platform": platform,
@@ -463,6 +486,18 @@ def main():
         if not preview_valid:
             st.error(f"❌ 配置无效: {preview_error}")
         else:
+            # 保存用户偏好设置
+            save_from_form_values(
+                platform=common_config["platform"],
+                login_type=common_config["login_type"],
+                crawler_type=common_config["crawler_type"],
+                save_option=common_config["save_option"],
+                max_comments=common_config["max_comments"],
+                get_comment=common_config["get_comment"],
+                get_sub_comment=common_config["get_sub_comment"],
+                headless=common_config["headless"],
+                save_path=common_config.get("save_path", ""),
+            )
             # 设置运行状态并重新运行以禁用按钮
             st.session_state.is_running = True
             st.rerun()

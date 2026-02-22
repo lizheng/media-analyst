@@ -49,12 +49,13 @@ def test_app_initial_load():
 # ============================================================================
 
 def test_default_platform():
-    """测试默认选中第一个平台"""
+    """测试默认选中平台（受持久化偏好影响，默认是dy抖音）"""
     at = AppTest.from_file(APP_PATH)
     at.run()
 
     platform_select = at.sidebar.selectbox[0]
-    assert platform_select.value == "xhs"  # 第一个平台
+    # 持久化模块默认选择 dy（抖音）
+    assert platform_select.value == "dy"
 
 
 def test_switch_platform():
