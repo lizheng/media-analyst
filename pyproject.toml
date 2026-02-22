@@ -1,19 +1,36 @@
 [project]
 name = "media-analyst"
-version = "0.1.0"
-description = "基于 MediaCrawler 的媒体分析工具"
+version = "0.2.0"
+description = "基于 MediaCrawler 的媒体分析工具 - Functional Core, Imperative Shell 架构"
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
     "streamlit >= 1.40.0",
     "watchdog>=6.0.0",
+    "pydantic>=2.0.0",
 ]
+
+[project.scripts]
+media-analyst = "media_analyst.ui.app:main"
 
 [dependency-groups]
 dev = [
     "pytest>=8.0.0",
     "pytest-timeout>=2.2.0",
     "pytest-asyncio>=0.23.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/media_analyst"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/src",
+    "/tests",
 ]
 
 [[tool.uv.index]]
@@ -26,6 +43,10 @@ python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
 addopts = "-v"
+markers = [
+    "real_crawler: 标记需要真实执行MediaCrawler的测试",
+    "human_interaction: 标记需要人类介入（如扫码）的测试",
+]
 
 [tool.pytest-timeout]
 timeout = 300  # 5分钟超时，允许扫码
