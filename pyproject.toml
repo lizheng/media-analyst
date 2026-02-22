@@ -11,7 +11,7 @@ dependencies = [
 ]
 
 [project.scripts]
-media-analyst = "media_analyst.ui.app:main"
+media-analyst = "media_analyst.cli:main"
 
 [dependency-groups]
 dev = [
