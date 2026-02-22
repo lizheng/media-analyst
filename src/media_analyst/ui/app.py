@@ -6,6 +6,8 @@ Functional Core, Imperative Shell 架构：
 2. Shell: CrawlerRunner 执行（副作用）
 """
 
+import platform as _platform_module
+
 import streamlit as st
 from pathlib import Path
 
@@ -23,6 +25,8 @@ from media_analyst.core import (
     DetailRequest,
     CreatorRequest,
     CrawlerExecution,
+    extract_douyin_links,
+    format_link_for_display,
 )
 from media_analyst.core.params import preview_command
 from media_analyst.shell import CrawlerRunner, CrawlerRunnerError
@@ -130,19 +134,49 @@ def render_search_form() -> dict:
     }
 
 
-def render_detail_form() -> dict:
+def render_detail_form(platform: str) -> dict:
     """渲染详情模式表单"""
     st.subheader("📄 详情模式配置")
+
+    # 根据平台显示不同的提示
+    if platform == "dy":
+        help_text = (
+            "支持以下格式（自动识别）：\n"
+            "• 抖音分享文本（自动提取链接）\n"
+            "• 短链：https://v.douyin.com/xxxxx/\n"
+            "• 视频页：https://www.douyin.com/video/xxxxx\n"
+            "• 图文页：https://www.douyin.com/note/xxxxx\n"
+            "• 多个链接用逗号分隔"
+        )
+        placeholder = "粘贴抖音分享文本或链接，多个用逗号分隔"
+    else:
+        help_text = "输入要爬取的笔记或视频链接/ID"
+        placeholder = "输入 URL 或 ID，多个用逗号分隔"
+
     specified_ids = st.text_area(
         "笔记/视频 URL 或 ID",
-        placeholder="输入 URL 或 ID，多个用逗号分隔",
-        help="输入要爬取的笔记或视频链接/ID",
+        placeholder=placeholder,
+        help=help_text,
     )
+
+    # 抖音平台：实时预览解析结果
+    parsed_links = []
+    if platform == "dy" and specified_ids.strip():
+        parsed_links = extract_douyin_links(specified_ids)
+        if parsed_links:
+            with st.expander(f"🔗 已识别 {len(parsed_links)} 个链接", expanded=True):
+                for link in parsed_links:
+                    st.text(format_link_for_display(link))
+                    st.caption(f"标准化: {link.normalized}")
+        elif specified_ids.strip():
+            st.warning("⚠️ 未识别到有效的抖音链接")
+
     start_page = st.number_input("起始页码", min_value=1, value=1)
 
     return {
         "specified_ids": specified_ids,
         "start_page": start_page,
+        "parsed_links": parsed_links,
     }
 
 
@@ -207,7 +241,15 @@ def build_request(common_config: dict, mode_config: dict) -> SearchRequest | Det
         )
 
     elif crawler_type == "detail":
-        specified_ids = mode_config.get("specified_ids", "").strip()
+        # 如果存在解析后的链接（抖音平台），使用标准化后的链接
+        parsed_links = mode_config.get("parsed_links", [])
+        if parsed_links:
+            # 使用标准化后的链接，逗号分隔
+            normalized_urls = [link.normalized for link in parsed_links]
+            specified_ids = ",".join(normalized_urls)
+        else:
+            specified_ids = mode_config.get("specified_ids", "").strip()
+
         if not specified_ids:
             raise ValueError("详情模式必须填写笔记/视频 URL 或 ID")
         return DetailRequest(
@@ -230,57 +272,89 @@ def build_request(common_config: dict, mode_config: dict) -> SearchRequest | Det
         raise ValueError(f"未知的爬虫类型: {crawler_type}")
 
 
-def run_crawler_ui(request: SearchRequest | DetailRequest | CreatorRequest) -> None:
+def open_results_directory(save_path: str | None) -> None:
+    """打开结果目录
+
+    注意：路径是相对于 MediaCrawler 目录的，因为爬虫在那里运行
+    """
+    import subprocess
+
+    # 确定要打开的目录路径（相对于 MEDIA_CRAWLER_PATH）
+    if save_path:
+        # 用户指定的路径是相对于 MediaCrawler 的
+        target_path = MEDIA_CRAWLER_PATH / save_path
+    else:
+        target_path = MEDIA_CRAWLER_PATH / "data"
+
+    # 解析为绝对路径并规范化
+    target_path = target_path.resolve()
+
+    if not target_path.exists():
+        st.warning(f"目录不存在: {target_path}")
+        return
+
+    # 根据操作系统选择打开方式
+    system = _platform_module.system()
+    try:
+        if system == "Darwin":  # macOS
+            subprocess.Popen(["open", str(target_path)])
+        elif system == "Windows":
+            subprocess.Popen(["explorer", str(target_path)])
+        else:  # Linux
+            subprocess.Popen(["xdg-open", str(target_path)])
+        st.toast(f"已打开目录: {target_path}")
+    except Exception as e:
+        st.error(f"无法打开目录: {e}")
+
+
+def run_crawler_ui(request: SearchRequest | DetailRequest | CreatorRequest) -> CrawlerExecution | None:
     """
     运行爬虫并显示结果（Shell - 副作用）
+
+    Returns:
+        CrawlerExecution 对象，如果失败则返回 None
     """
     # 初始化 Runner
     try:
         runner = CrawlerRunner(MEDIA_CRAWLER_PATH)
     except CrawlerRunnerError as e:
         st.error(f"❌ {e}")
-        return
+        return None
 
     # 创建输出区域
     st.info("🔄 正在启动爬虫...")
     output_container = st.container()
-    stdout_placeholder = output_container.empty()
-    stderr_placeholder = output_container.empty()
+    output_placeholder = output_container.empty()
 
     try:
         # 启动爬虫
         execution = runner.start(request)
 
-        # 实时显示输出
-        stdout_lines = []
-        stderr_lines = []
+        # 实时显示输出（合并 stdout 和 stderr，使用普通文本样式）
+        all_lines = []
 
         for line in runner.iter_output(execution, timeout=300):  # 5分钟超时
             if line.startswith("[stderr] "):
-                stderr_lines.append(line[9:])
-                # 只显示最后20行错误
-                stderr_placeholder.error("\n".join(stderr_lines[-20:]))
+                all_lines.append(line[9:])
             else:
-                stdout_lines.append(line)
-                # 只显示最后50行输出
-                stdout_placeholder.code("\n".join(stdout_lines[-50:]), language="text")
+                all_lines.append(line)
+            # 只显示最后100行，使用普通code样式（非红色）
+            output_placeholder.code("\n".join(all_lines[-100:]), language="text")
 
         # 显示结果
         if execution.status.value == "completed":
             st.success(f"✅ 爬取完成！耗时 {execution.duration_seconds:.1f} 秒")
-
-            # 显示输出文件
-            if execution.output_files:
-                with st.expander("📁 输出文件"):
-                    for f in execution.output_files:
-                        st.text(f)
         else:
             st.error(f"❌ 爬取失败: {execution.error_message or '未知错误'}")
 
+        return execution
+
     except TimeoutError:
         st.error("❌ 执行超时（5分钟）")
+        return None
     except Exception as e:
         st.error(f"❌ 运行出错: {str(e)}")
+        return None
 
 
 # ========== 主应用 ==========
@@ -290,6 +364,37 @@ def main():
     # 页面标题
     st.title("🕷️ MediaCrawler 控制台")
     st.markdown("通过 Web 界面配置和运行 MediaCrawler，无需命令行操作")
+
+    # 使用说明 - 折叠状态，放在页面顶部便于查看
+    with st.expander("📖 使用说明", expanded=False):
+        st.markdown("""
+        ### 快速开始
+
+        1. **选择平台**：在侧边栏选择要爬取的平台（小红书、抖音、B站等）
+        2. **选择登录方式**：
+           - **扫码登录**：会弹出二维码，用手机扫码
+           - **手机号登录**：输入手机号和验证码
+           - **Cookie 登录**：使用已保存的 Cookie（需要提前配置）
+        3. **选择爬虫类型**：
+           - **搜索模式**：按关键词搜索内容
+           - **详情模式**：爬取指定笔记/视频的详情
+           - **创作者模式**：爬取指定创作者的所有内容
+        4. **配置参数**：根据爬虫类型填写相应的参数
+        5. **点击开始**：点击"开始爬取"按钮运行
+
+        ### 注意事项
+
+        - 首次使用需要先登录获取 Cookie
+        - 建议开启无头模式（后台运行）
+        - 爬取频率过高可能导致账号受限，请合理设置参数
+        - 数据默认保存在 MediaCrawler/data/ 目录下
+        """)
+
+    st.divider()
+
+    # 初始化 session state
+    if "is_running" not in st.session_state:
+        st.session_state.is_running = False
 
     # 侧边栏配置
     common_config = render_sidebar()
@@ -303,7 +408,7 @@ def main():
     if crawler_type == "search":
         mode_config = render_search_form()
     elif crawler_type == "detail":
-        mode_config = render_detail_form()
+        mode_config = render_detail_form(common_config["platform"])
     elif crawler_type == "creator":
         mode_config = render_creator_form()
     else:
@@ -335,48 +440,58 @@ def main():
 
     # 运行按钮
     st.divider()
-    if st.button("🚀 开始爬取", type="primary", use_container_width=True):
+
+    # 使用 columns 布局，让开始按钮和打开目录按钮并排
+    col1, col2 = st.columns([3, 1])
+
+    with col1:
+        start_button = st.button(
+            "🚀 开始爬取",
+            type="primary",
+            use_container_width=True,
+            disabled=st.session_state.is_running,
+        )
+
+    with col2:
+        # 打开目录按钮（始终可用）
+        if st.button("📂 打开结果目录", use_container_width=True):
+            # 获取当前配置的保存路径
+            save_path = common_config.get("save_path")
+            open_results_directory(save_path)
+
+    if start_button:
         if not preview_valid:
             st.error(f"❌ 配置无效: {preview_error}")
-            return
+        else:
+            # 设置运行状态并重新运行以禁用按钮
+            st.session_state.is_running = True
+            st.rerun()
 
-        # 运行爬虫（Shell - 副作用）
-        run_crawler_ui(request)
+    # 如果处于运行状态，执行爬虫
+    if st.session_state.is_running:
+        if preview_valid and request:
+            execution = run_crawler_ui(request)
 
-    # 使用说明
-    with st.expander("📖 使用说明"):
-        st.markdown("""
-        ### 快速开始
+            # 运行完成后，显示打开目录按钮（如果成功）
+            if execution and execution.status.value == "completed":
+                st.divider()
+                result_col1, result_col2 = st.columns([2, 1])
 
-        1. **选择平台**：在侧边栏选择要爬取的平台（小红书、抖音、B站等）
-        2. **选择登录方式**：
-           - **扫码登录**：会弹出二维码，用手机扫码
-           - **手机号登录**：输入手机号和验证码
-           - **Cookie 登录**：使用已保存的 Cookie（需要提前配置）
-        3. **选择爬虫类型**：
-           - **搜索模式**：按关键词搜索内容
-           - **详情模式**：爬取指定笔记/视频的详情
-           - **创作者模式**：爬取指定创作者的所有内容
-        4. **配置参数**：根据爬虫类型填写相应的参数
-        5. **点击开始**：点击"开始爬取"按钮运行
+                with result_col1:
+                    # 显示输出文件
+                    if execution.output_files:
+                        with st.expander("📁 输出文件列表"):
+                            for f in execution.output_files:
+                                st.text(f)
 
-        ### 架构说明
+                with result_col2:
+                    # 快捷打开目录按钮
+                    save_path = common_config.get("save_path")
+                    if st.button("📂 打开结果目录", type="primary", use_container_width=True):
+                        open_results_directory(save_path)
 
-        本项目采用 **Functional Core, Imperative Shell** 架构：
-
-        - **Core（纯函数）**：数据模型（Pydantic）和参数构建逻辑，无副作用
-        - **Shell（副作用）**：进程管理、文件系统操作
-        - **UI（Streamlit）**：界面渲染和用户交互
-
-        这种分离使代码更易测试、更易维护。
-
-        ### 注意事项
-
-        - 首次使用需要先登录获取 Cookie
-        - 建议开启无头模式（后台运行）
-        - 爬取频率过高可能导致账号受限，请合理设置参数
-        - 数据默认保存在 MediaCrawler/data/ 目录下
-        """)
+        # 重置运行状态
+        st.session_state.is_running = False
 
     # 页脚
     st.divider()

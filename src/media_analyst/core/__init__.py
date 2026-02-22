@@ -21,6 +21,15 @@ from media_analyst.core.models import (
 )
 from media_analyst.core.config import PLATFORMS, LOGIN_TYPES, CRAWLER_TYPES, SAVE_OPTIONS
 from media_analyst.core.params import build_args
+from media_analyst.core.url_parser import (
+    ParsedLink,
+    URLParseError,
+    extract_urls_from_text,
+    parse_douyin_url,
+    extract_douyin_links,
+    normalize_douyin_links,
+    format_link_for_display,
+)
 
 __all__ = [
     "CrawlerRequest",
@@ -38,4 +47,11 @@ __all__ = [
     "CRAWLER_TYPES",
     "SAVE_OPTIONS",
     "build_args",
+    "ParsedLink",
+    "URLParseError",
+    "extract_urls_from_text",
+    "parse_douyin_url",
+    "extract_douyin_links",
+    "normalize_douyin_links",
+    "format_link_for_display",
 ]

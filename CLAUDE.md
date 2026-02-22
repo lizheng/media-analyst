@@ -141,6 +141,7 @@ class CreatorRequest(BaseModel):
 - `models.py` - Pydantic data models (SearchRequest, DetailRequest, CreatorRequest, CrawlerExecution)
 - `params.py` - Pure functions for building CLI arguments
 - `config.py` - Constants and mappings
+- `url_parser.py` - Douyin URL extraction and normalization (pure functions)
 
 **src/media_analyst/shell/** - Imperative Shell (side effects)
 - `runner.py` - CrawlerRunner class for process management (subprocess)
@@ -161,6 +162,41 @@ UI 显示 ← CrawlerExecution ← CrawlerRunner ← subprocess.Popen
 3. `request.to_cli_args()` generates CLI arguments (pure function)
 4. `CrawlerRunner.start(request)` spawns subprocess: `uv run main.py [args]`
 5. `CrawlerExecution` tracks process state, stdout/stderr, and output files
+
+### URL Parsing (Douyin)
+
+The application includes a URL parser for Douyin links that supports extracting and normalizing various URL formats:
+
+**Supported URL formats:**
+- Short links: `https://v.douyin.com/xxxxx/` (requires resolver for full normalization)
+- Video pages: `https://www.douyin.com/video/xxxxx`
+- Note pages: `https://www.douyin.com/note/xxxxx` → normalized to video format
+- Featured pages: `https://www.douyin.com/jingxuan?modal_id=xxxxx` → normalized to video format
+- Mobile pages: `https://m.douyin.com/share/video/xxxxx` → normalized to video format
+
+**Usage in Core:**
+```python
+from media_analyst.core import extract_douyin_links, format_link_for_display
+
+# Extract links from share text or comma-separated URLs
+text = "6.61 w@f.bn https://v.douyin.com/abc123/ 复制此链接"
+links = extract_douyin_links(text)
+
+# links[0].link_type == "short"
+# links[0].video_id == "abc123"
+# links[0].normalized == "https://v.douyin.com/abc123/" (unchanged for short links)
+
+# To resolve short links, provide a resolver function:
+def resolve_short_link(url: str) -> str:
+    import requests
+    response = requests.head(url, allow_redirects=True)
+    return response.url
+
+links = extract_douyin_links(text, short_link_resolver=resolve_short_link)
+# Now links[0].link_type == "video" with real video ID
+```
+
+**Note:** Short link resolution requires HTTP requests (side effects), so it's implemented as an optional callback. The Core layer remains pure - the Shell layer can provide the resolver when needed.
 
 ### External Dependency
 
@@ -206,6 +242,7 @@ uv run pytest tests/unit -v
 - `build_args()` 纯函数
 - `to_cli_args()` 方法
 - 模型序列化/反序列化
+- URL 解析（`extract_douyin_links`, `parse_douyin_url`）- 支持多种抖音链接格式
 
 **示例**（纯函数测试）：
 ```python
@@ -289,7 +326,7 @@ uv run pytest tests/real_crawler -v -s
 - Project layout: `src/` layout (modern Python packaging)
 - Architecture: Functional Core, Imperative Shell (FCIS)
 - Design Principle: Make Illegal States Unrepresentable (MISM)
-- The TODO.md tracks known issues: logging cleanup, button states, speed optimization, URL detection/parsing, and UI state persistence
+- The TODO.md tracks known issues: logging cleanup, button states, speed optimization, and UI state persistence
 
 ## Key Insights
 
