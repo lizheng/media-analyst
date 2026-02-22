@@ -6,8 +6,25 @@ readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
     "streamlit >= 1.40.0",
+    "watchdog>=6.0.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-timeout>=2.2.0",
 ]
 
 [[tool.uv.index]]
 url = "https://pypi.tuna.tsinghua.edu.cn/simple"
 default = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v"
+
+[tool.pytest-timeout]
+timeout = 300  # 5分钟超时，允许扫码

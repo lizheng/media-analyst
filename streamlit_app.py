@@ -16,7 +16,7 @@ st.set_page_config(
 )
 
 # MediaCrawler 路径
-MEDIA_CRAWLER_PATH = Path("/Users/david/Documents/workspace/MediaCrawler")
+MEDIA_CRAWLER_PATH = Path("../MediaCrawler")
 
 # 平台配置
 PLATFORMS = {
