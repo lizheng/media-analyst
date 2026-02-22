@@ -1,0 +1,40 @@
+[
+  {
+    "comment_id": "comment_001",
+    "create_time": 1708512000,
+    "ip_location": "北京",
+    "aweme_id": "1234567890",
+    "content": "这是一条测试评论",
+    "user_id": "111111111",
+    "sec_uid": "MS4wLjABAAAAxxxxxxxx",
+    "short_user_id": "11111111",
+    "user_unique_id": "comment_user1",
+    "user_signature": null,
+    "nickname": "评论用户1",
+    "avatar": "https://example.com/avatar1.jpg",
+    "sub_comment_count": "2",
+    "like_count": 10,
+    "last_modify_ts": 1708512000000,
+    "parent_comment_id": "0",
+    "pictures": ""
+  },
+  {
+    "comment_id": "comment_002",
+    "create_time": 1708512100,
+    "ip_location": "上海",
+    "aweme_id": "1234567890",
+    "content": "这是另一条评论",
+    "user_id": "222222222",
+    "sec_uid": "MS4wLjABAAAAyyyyyyyy",
+    "short_user_id": "22222222",
+    "user_unique_id": "comment_user2",
+    "user_signature": null,
+    "nickname": "评论用户2",
+    "avatar": "https://example.com/avatar2.jpg",
+    "sub_comment_count": "0",
+    "like_count": 5,
+    "last_modify_ts": 1708512100000,
+    "parent_comment_id": "0",
+    "pictures": "https://example.com/comment_pic.jpg"
+  }
+]

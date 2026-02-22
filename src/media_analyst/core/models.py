@@ -334,3 +334,336 @@ class CrawlerExecution(BaseModel):
     def full_stderr(self) -> str:
         """完整错误输出文本"""
         return "\n".join(self.stderr_lines)
+
+
+# =============================================================================
+# 数据解析模型（用于解析抓取结果）
+# =============================================================================
+
+class ContentType(str, Enum):
+    """内容类型"""
+    VIDEO = "video"      # 视频
+    NOTE = "note"        # 图文/笔记
+    ARTICLE = "article"  # 文章
+    UNKNOWN = "unknown"  # 未知
+
+
+class Post(BaseModel):
+    """
+    帖子/视频信息模型（统一各平台格式）
+
+    将不同平台的字段统一为标准格式：
+    - 抖音: aweme_id -> content_id
+    - 小红书: note_id -> content_id
+    - B站: bvid -> content_id
+    """
+    model_config = {"frozen": True}
+
+    # 核心标识
+    content_id: str = Field(..., description="内容ID（平台唯一标识）")
+    platform: Platform = Field(..., description="所属平台")
+    content_type: ContentType = Field(default=ContentType.UNKNOWN, description="内容类型")
+
+    # 内容信息
+    title: str = Field(default="", description="标题")
+    desc: str = Field(default="", description="描述/正文")
+    content_url: str = Field(default="", description="内容链接")
+    cover_url: str = Field(default="", description="封面图片URL")
+    media_urls: List[str] = Field(default_factory=list, description="媒体文件URL（视频/图片）")
+
+    # 时间信息
+    create_time: Optional[datetime] = Field(default=None, description="发布时间")
+    last_modify_ts: Optional[int] = Field(default=None, description="最后修改时间戳")
+
+    # 作者信息
+    user_id: str = Field(default="", description="用户ID")
+    sec_uid: str = Field(default="", description="安全用户ID（抖音等平台）")
+    short_user_id: str = Field(default="", description="短用户ID")
+    user_unique_id: str = Field(default="", description="用户唯一标识")
+    nickname: str = Field(default="", description="昵称")
+    avatar: str = Field(default="", description="头像URL")
+    user_signature: str = Field(default="", description="用户简介")
+
+    # 互动数据
+    liked_count: int = Field(default=0, description="点赞数")
+    collected_count: int = Field(default=0, description="收藏数")
+    comment_count: int = Field(default=0, description="评论数")
+    share_count: int = Field(default=0, description="分享数")
+
+    # 其他
+    ip_location: str = Field(default="", description="IP属地")
+    source_keyword: str = Field(default="", description="来源关键词")
+
+    # 元数据
+    crawl_time: Optional[datetime] = Field(default=None, description="抓取时间（从文件名提取）")
+    source_file: str = Field(default="", description="来源文件路径")
+
+    # 保留原始数据（用于高级查询）
+    raw_data: Dict[str, Any] = Field(default_factory=dict, description="原始数据")
+
+    @field_validator("create_time", mode="before")
+    @classmethod
+    def parse_timestamp(cls, v: Any) -> Optional[datetime]:
+        """将 Unix 时间戳转换为 datetime"""
+        if v is None:
+            return None
+        if isinstance(v, datetime):
+            return v
+        if isinstance(v, (int, float)):
+            return datetime.fromtimestamp(v)
+        if isinstance(v, str):
+            # 尝试解析数字字符串
+            try:
+                return datetime.fromtimestamp(int(v))
+            except ValueError:
+                pass
+            # 尝试 ISO 格式
+            try:
+                return datetime.fromisoformat(v.replace("Z", "+00:00"))
+            except ValueError:
+                return None
+        return None
+
+    @field_validator("liked_count", "collected_count", "comment_count", "share_count", mode="before")
+    @classmethod
+    def parse_count(cls, v: Any) -> int:
+        """将字符串数字转换为整数"""
+        if v is None:
+            return 0
+        if isinstance(v, int):
+            return v
+        if isinstance(v, str):
+            try:
+                return int(v) if v else 0
+            except ValueError:
+                return 0
+        return 0
+
+
+class Comment(BaseModel):
+    """
+    评论信息模型（统一各平台格式）
+
+    支持主评论和子评论（回复）
+    """
+    model_config = {"frozen": True}
+
+    # 核心标识
+    comment_id: str = Field(..., description="评论ID")
+    content_id: str = Field(..., description="关联的内容ID")
+    platform: Platform = Field(..., description="所属平台")
+
+    # 评论内容
+    content: str = Field(default="", description="评论内容")
+    pictures: List[str] = Field(default_factory=list, description="评论图片URL")
+
+    # 时间信息
+    create_time: Optional[datetime] = Field(default=None, description="评论时间")
+    last_modify_ts: Optional[int] = Field(default=None, description="最后修改时间戳")
+
+    # 作者信息
+    user_id: str = Field(default="", description="用户ID")
+    sec_uid: str = Field(default="", description="安全用户ID")
+    short_user_id: str = Field(default="", description="短用户ID")
+    user_unique_id: str = Field(default="", description="用户唯一标识")
+    nickname: str = Field(default="", description="昵称")
+    avatar: str = Field(default="", description="头像URL")
+    user_signature: Optional[str] = Field(default=None, description="用户简介")
+
+    # 互动数据
+    like_count: int = Field(default=0, description="点赞数")
+    sub_comment_count: int = Field(default=0, description="子评论数")
+
+    # 层级关系
+    parent_comment_id: Optional[str] = Field(default=None, description="父评论ID（子评论使用）")
+    is_sub_comment: bool = Field(default=False, description="是否为子评论")
+
+    # 其他
+    ip_location: str = Field(default="", description="IP属地")
+
+    # 元数据
+    crawl_time: Optional[datetime] = Field(default=None, description="抓取时间（从文件名提取）")
+    source_file: str = Field(default="", description="来源文件路径")
+
+    # 元数据
+    crawl_time: Optional[datetime] = Field(default=None, description="抓取时间（从文件名提取）")
+    source_file: str = Field(default="", description="来源文件路径")
+
+    # 保留原始数据
+    raw_data: Dict[str, Any] = Field(default_factory=dict, description="原始数据")
+
+    @field_validator("create_time", mode="before")
+    @classmethod
+    def parse_timestamp(cls, v: Any) -> Optional[datetime]:
+        """将 Unix 时间戳转换为 datetime"""
+        if v is None:
+            return None
+        if isinstance(v, datetime):
+            return v
+        if isinstance(v, (int, float)):
+            return datetime.fromtimestamp(v)
+        if isinstance(v, str):
+            try:
+                return datetime.fromtimestamp(int(v))
+            except ValueError:
+                pass
+            try:
+                return datetime.fromisoformat(v.replace("Z", "+00:00"))
+            except ValueError:
+                return None
+        return None
+
+    @field_validator("like_count", "sub_comment_count", mode="before")
+    @classmethod
+    def parse_count(cls, v: Any) -> int:
+        """将字符串数字转换为整数"""
+        if v is None:
+            return 0
+        if isinstance(v, int):
+            return v
+        if isinstance(v, str):
+            try:
+                return int(v) if v else 0
+            except ValueError:
+                return 0
+        return 0
+
+    @field_validator("pictures", mode="before")
+    @classmethod
+    def parse_pictures(cls, v: Any) -> List[str]:
+        """解析图片字段（支持逗号分隔的字符串或列表）"""
+        if v is None:
+            return []
+        if isinstance(v, list):
+            return v
+        if isinstance(v, str):
+            if not v:
+                return []
+            return [url.strip() for url in v.split(",") if url.strip()]
+        return []
+
+
+class ParsedData(BaseModel):
+    """
+    解析结果容器
+
+    包含解析后的帖子和评论列表，以及解析统计信息
+    """
+    model_config = {"frozen": False}  # 允许后续更新统计信息
+
+    posts: List[Post] = Field(default_factory=list, description="帖子列表")
+    comments: List[Comment] = Field(default_factory=list, description="评论列表")
+    platform: Optional[Platform] = Field(default=None, description="检测到的平台")
+
+    # 解析统计
+    total_records: int = Field(default=0, description="总记录数")
+    success_count: int = Field(default=0, description="成功解析数")
+    error_count: int = Field(default=0, description="解析失败数")
+    errors: List[str] = Field(default_factory=list, description="错误信息列表")
+
+    @property
+    def total_interactions(self) -> Dict[str, int]:
+        """计算总互动量"""
+        return {
+            "likes": sum(p.liked_count for p in self.posts),
+            "collects": sum(p.collected_count for p in self.posts),
+            "comments": sum(p.comment_count for p in self.posts),
+            "shares": sum(p.share_count for p in self.posts),
+        }
+
+    @property
+    def user_count(self) -> int:
+        """统计唯一用户数量"""
+        user_ids = set()
+        for post in self.posts:
+            if post.user_id:
+                user_ids.add((post.platform.value, post.user_id))
+        for comment in self.comments:
+            if comment.user_id:
+                user_ids.add((comment.platform.value, comment.user_id))
+        return len(user_ids)
+
+    @property
+    def deduplication_stats(self) -> Dict[str, int]:
+        """获取去重统计信息"""
+        # 统计帖子重复数
+        post_keys = {}
+        for post in self.posts:
+            key = (post.platform.value, post.content_id)
+            if key in post_keys:
+                post_keys[key] += 1
+            else:
+                post_keys[key] = 1
+        duplicate_posts = sum(1 for count in post_keys.values() if count > 1)
+
+        # 统计评论重复数
+        comment_keys = {}
+        for comment in self.comments:
+            key = (comment.platform.value, comment.comment_id)
+            if key in comment_keys:
+                comment_keys[key] += 1
+            else:
+                comment_keys[key] = 1
+        duplicate_comments = sum(1 for count in comment_keys.values() if count > 1)
+
+        return {
+            "duplicate_posts": duplicate_posts,
+            "duplicate_comments": duplicate_comments,
+            "total_duplicates": duplicate_posts + duplicate_comments,
+        }
+
+    def deduplicate(self) -> "ParsedData":
+        """
+        去重处理：相同内容保留最新抓取的数据
+
+        去重规则：
+        - 帖子：(platform, content_id) 相同视为重复
+        - 评论：(platform, comment_id) 相同视为重复
+        - 保留 crawl_time 最新的数据，如果没有 crawl_time 则保留最后遇到的
+
+        Returns:
+            去重后的新 ParsedData 对象
+        """
+        from datetime import datetime
+
+        # 去重帖子：用字典保留最新数据
+        post_map: Dict[tuple[str, str], Post] = {}
+        for post in self.posts:
+            key = (post.platform.value, post.content_id)
+            if key in post_map:
+                existing = post_map[key]
+                # 保留 crawl_time 更新的，如果没有则保留当前（后遇到的优先）
+                if post.crawl_time and existing.crawl_time:
+                    if post.crawl_time > existing.crawl_time:
+                        post_map[key] = post
+                else:
+                    post_map[key] = post  # 没有 crawl_time 时保留后遇到的
+            else:
+                post_map[key] = post
+
+        # 去重评论
+        comment_map: Dict[tuple[str, str], Comment] = {}
+        for comment in self.comments:
+            key = (comment.platform.value, comment.comment_id)
+            if key in comment_map:
+                existing = comment_map[key]
+                if comment.crawl_time and existing.crawl_time:
+                    if comment.crawl_time > existing.crawl_time:
+                        comment_map[key] = comment
+                else:
+                    comment_map[key] = comment
+            else:
+                comment_map[key] = comment
+
+        # 创建新的解析结果
+        deduplicated = ParsedData(
+            posts=list(post_map.values()),
+            comments=list(comment_map.values()),
+            platform=self.platform,
+            total_records=self.total_records,
+            success_count=len(post_map) + len(comment_map),
+            error_count=self.error_count,
+            errors=self.errors,
+        )
+
+        return deduplicated

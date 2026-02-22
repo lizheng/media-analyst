@@ -1,5 +1,9 @@
 """
-MediaCrawler Streamlit 界面
+MediaCrawler Streamlit 界面 - 多页面应用
+
+页面结构：
+- 首页 (Crawl): 爬虫控制
+- 解析 (Parse): 数据解析
 
 Functional Core, Imperative Shell 架构：
 1. Core: 构建 CrawlerRequest 模型（纯函数）
@@ -7,9 +11,9 @@ Functional Core, Imperative Shell 架构：
 """
 
 import platform as _platform_module
+from pathlib import Path
 
 import streamlit as st
-from pathlib import Path
 
 # 使用绝对导入（假设通过 pip install -e . 安装）
 from media_analyst.core import (
@@ -33,17 +37,10 @@ from media_analyst.shell import CrawlerRunner, CrawlerRunnerError
 from media_analyst.ui.persistence import (
     load_preferences,
     save_from_form_values,
+    get_media_crawler_path,
+    save_media_crawler_path,
+    get_media_crawler_path_options,
 )
-
-# 页面配置
-st.set_page_config(
-    page_title="MediaCrawler 控制台",
-    page_icon="🕷️",
-    layout="wide",
-)
-
-# MediaCrawler 路径
-MEDIA_CRAWLER_PATH = Path("../MediaCrawler")
 
 
 def render_sidebar() -> dict:
@@ -127,6 +124,58 @@ def render_sidebar() -> dict:
             get_sub_comment = st.checkbox("获取子评论", value=prefs.get_sub_comment)
 
         headless = st.checkbox("无头模式", value=prefs.headless, help="后台运行浏览器（不显示窗口）")
+
+        # MediaCrawler 路径配置
+        st.divider()
+        st.header("📁 MediaCrawler 路径")
+
+        # 获取当前路径
+        current_mc_path = get_media_crawler_path()
+        st.caption(f"当前: {current_mc_path}")
+
+        # 路径选择
+        path_options = get_media_crawler_path_options()
+        path_options_str = [str(p) for p in path_options]
+
+        # 如果当前路径不在选项中，添加它
+        current_str = str(current_mc_path)
+        if current_str not in path_options_str:
+            path_options_str.insert(0, current_str)
+
+        # 自动检测选项
+        path_options_str.insert(0, "自动检测")
+
+        selected_path = st.selectbox(
+            "选择路径",
+            path_options_str,
+            index=0 if current_str not in path_options_str else path_options_str.index(current_str),
+            help="选择 MediaCrawler 项目根目录"
+        )
+
+        # 自定义路径输入
+        custom_path = st.text_input(
+            "或输入自定义路径",
+            value="",
+            placeholder="/path/to/MediaCrawler",
+            help="输入 MediaCrawler 的完整路径"
+        )
+
+        # 保存路径配置
+        if st.button("💾 保存路径配置", use_container_width=True):
+            path_to_save = custom_path if custom_path else (None if selected_path == "自动检测" else selected_path)
+            if path_to_save:
+                if save_media_crawler_path(path_to_save):
+                    st.success("✅ 路径已保存")
+                    st.rerun()
+                else:
+                    st.error("❌ 无效路径，请确保是 MediaCrawler 根目录")
+            else:
+                # 清空自定义路径，使用自动检测
+                prefs = load_preferences()
+                prefs.media_crawler_path = ""
+                save_preferences(prefs)
+                st.success("✅ 已重置为自动检测")
+                st.rerun()
 
     return {
         "platform": platform,
@@ -302,12 +351,15 @@ def open_results_directory(save_path: str | None) -> None:
     """
     import subprocess
 
-    # 确定要打开的目录路径（相对于 MEDIA_CRAWLER_PATH）
+    # 获取 MediaCrawler 路径
+    media_crawler_path = get_media_crawler_path()
+
+    # 确定要打开的目录路径（相对于 MediaCrawler 路径）
     if save_path:
         # 用户指定的路径是相对于 MediaCrawler 的
-        target_path = MEDIA_CRAWLER_PATH / save_path
+        target_path = media_crawler_path / save_path
     else:
-        target_path = MEDIA_CRAWLER_PATH / "data"
+        target_path = media_crawler_path / "data"
 
     # 解析为绝对路径并规范化
     target_path = target_path.resolve()
@@ -337,9 +389,18 @@ def run_crawler_ui(request: SearchRequest | DetailRequest | CreatorRequest) -> C
     Returns:
         CrawlerExecution 对象，如果失败则返回 None
     """
+    # 获取 MediaCrawler 路径
+    media_crawler_path = get_media_crawler_path()
+
+    # 检查路径是否存在
+    if not media_crawler_path.exists():
+        st.error(f"❌ MediaCrawler 目录不存在: {media_crawler_path}")
+        st.info("💡 请在侧边栏配置 MediaCrawler 路径")
+        return None
+
     # 初始化 Runner
     try:
-        runner = CrawlerRunner(MEDIA_CRAWLER_PATH)
+        runner = CrawlerRunner(media_crawler_path)
     except CrawlerRunnerError as e:
         st.error(f"❌ {e}")
         return None
@@ -380,10 +441,10 @@ def run_crawler_ui(request: SearchRequest | DetailRequest | CreatorRequest) -> C
         return None
 
 
-# ========== 主应用 ==========
+# ========== 爬虫页面 ==========
 
-def main():
-    """主应用入口"""
+def crawl_page():
+    """爬虫控制页面"""
     # 页面标题
     st.title("🕷️ MediaCrawler 控制台")
     st.markdown("通过 Web 界面配置和运行 MediaCrawler，无需命令行操作")
@@ -452,7 +513,8 @@ def main():
 
     with st.expander("📜 命令预览"):
         if preview_valid and request:
-            cmd_str = preview_command(request, str(MEDIA_CRAWLER_PATH))
+            media_crawler_path = get_media_crawler_path()
+            cmd_str = preview_command(request, str(media_crawler_path))
             st.code(cmd_str, language="bash")
 
             # 显示模型详情
@@ -528,9 +590,27 @@ def main():
         # 重置运行状态
         st.session_state.is_running = False
 
-    # 页脚
-    st.divider()
-    st.caption("Powered by MediaCrawler | Streamlit 界面 v0.2.0")
+
+# ========== 解析页面 ==========
+
+def parse_page():
+    """数据解析页面（简单包装，实际逻辑在 parser_page.py）"""
+    # 重定向到独立的解析页面
+    from media_analyst.ui.parser_page import main as parser_main
+    parser_main()
+
+
+# ========== 主应用 ==========
+
+def main():
+    """主应用入口 - 页面导航"""
+    # 定义页面
+    crawl = st.Page(crawl_page, title="抓取数据", icon="🕷️")
+    parse = st.Page(parse_page, title="解析数据", icon="📊")
+
+    # 页面导航
+    pg = st.navigation([crawl, parse])
+    pg.run()
 
 
 if __name__ == "__main__":

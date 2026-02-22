@@ -29,6 +29,7 @@ class UserPreferences:
     get_comment: bool = False  # 默认不获取评论
     get_sub_comment: bool = False  # 默认不获取子评论
     headless: bool = True  # 默认无头模式
+    media_crawler_path: str = ""  # MediaCrawler 根目录路径（用户自定义）
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -106,6 +107,7 @@ def save_from_form_values(
     get_sub_comment: bool,
     headless: bool,
     save_path: str = "",
+    media_crawler_path: str = "",
 ) -> None:
     """
     从表单值创建并保存偏好
@@ -120,6 +122,7 @@ def save_from_form_values(
         get_sub_comment: 是否获取子评论
         headless: 是否无头模式
         save_path: 保存路径（可选）
+        media_crawler_path: MediaCrawler 路径（可选）
     """
     preferences = UserPreferences(
         platform=platform,
@@ -131,6 +134,7 @@ def save_from_form_values(
         get_comment=get_comment,
         get_sub_comment=get_sub_comment,
         headless=headless,
+        media_crawler_path=media_crawler_path,
     )
     save_preferences(preferences)
 
@@ -175,3 +179,158 @@ def clear_preferences() -> None:
 def get_prefs_file_path() -> Path:
     """获取偏好文件路径（用于显示）"""
     return PREFS_FILE
+
+
+# =============================================================================
+# MediaCrawler 路径管理
+# =============================================================================
+
+def _find_media_crawler_paths() -> list[Path]:
+    """
+    自动查找可能的 MediaCrawler 路径
+
+    按优先级返回候选路径列表
+    """
+    candidates = []
+
+    # 1. 当前工作目录的相对路径（首选项）
+    cwd_relative = Path("../MediaCrawler").resolve()
+    candidates.append(cwd_relative)
+
+    # 2. 基于当前文件位置（media-analyst/src/media_analyst/ui/persistence.py）
+    try:
+        current_file = Path(__file__).resolve()
+        # 向上回溯到 media-analyst 目录的父目录，查找 MediaCrawler
+        for parent in current_file.parents:
+            if parent.name == "media-analyst":
+                sibling_path = parent.parent / "MediaCrawler"
+                if sibling_path not in candidates:
+                    candidates.append(sibling_path)
+                break
+    except NameError:
+        pass
+
+    # 3. 基于当前工作目录向上查找
+    cwd = Path.cwd()
+    for parent in [cwd] + list(cwd.parents)[:3]:  # 最多向上3层
+        candidate = parent / "MediaCrawler"
+        if candidate not in candidates:
+            candidates.append(candidate)
+
+    # 4. 常见开发路径
+    home = Path.home()
+    common_paths = [
+        home / "workspace" / "MediaCrawler",
+        home / "Documents" / "workspace" / "MediaCrawler",
+        home / "Projects" / "MediaCrawler",
+        home / "media-analyst" / ".." / "MediaCrawler",
+    ]
+    for path in common_paths:
+        resolved = path.resolve()
+        if resolved not in candidates:
+            candidates.append(resolved)
+
+    return candidates
+
+
+def find_media_crawler_path() -> Path | None:
+    """
+    自动查找 MediaCrawler 目录
+
+    Returns:
+        找到的 MediaCrawler 路径，或 None
+    """
+    for candidate in _find_media_crawler_paths():
+        if candidate.exists() and candidate.is_dir():
+            # 验证是否是 MediaCrawler（检查特征文件/目录）
+            if (candidate / "main.py").exists() or (candidate / "config").exists():
+                return candidate
+    return None
+
+
+def get_media_crawler_path() -> Path:
+    """
+    获取 MediaCrawler 根目录路径
+
+    优先级：
+    1. 用户保存的自定义路径（如设置过）
+    2. 自动查找（当前工作目录相对路径优先）
+    3. 默认相对路径（可能不存在）
+
+    Returns:
+        MediaCrawler 路径
+    """
+    # 1. 检查用户保存的路径
+    prefs = load_preferences()
+    if prefs.media_crawler_path:
+        saved_path = Path(prefs.media_crawler_path)
+        if saved_path.exists():
+            return saved_path
+        # 如果保存的路径不存在，尝试作为相对路径解析
+        saved_relative = Path.cwd() / prefs.media_crawler_path
+        if saved_relative.exists():
+            return saved_relative.resolve()
+
+    # 2. 自动查找
+    found = find_media_crawler_path()
+    if found:
+        return found
+
+    # 3. 返回默认路径（当前工作目录相对路径）
+    return Path("../MediaCrawler").resolve()
+
+
+def save_media_crawler_path(path: str | Path) -> bool:
+    """
+    保存用户自定义的 MediaCrawler 路径
+
+    Args:
+        path: MediaCrawler 根目录路径
+
+    Returns:
+        是否保存成功
+    """
+    path_obj = Path(path).resolve() if path else Path()
+
+    if not path_obj.exists():
+        return False
+
+    if not path_obj.is_dir():
+        return False
+
+    # 验证目录有效性（至少包含 main.py 或 config 目录）
+    if not (path_obj / "main.py").exists() and not (path_obj / "config").exists():
+        return False
+
+    # 保存相对路径（如果可能）
+    try:
+        rel_path = path_obj.relative_to(Path.cwd())
+        path_str = str(rel_path)
+    except ValueError:
+        path_str = str(path_obj)
+
+    prefs = load_preferences()
+    prefs.media_crawler_path = path_str
+    save_preferences(prefs)
+    return True
+
+
+def get_media_crawler_path_options() -> list[Path]:
+    """
+    获取所有候选的 MediaCrawler 路径选项
+
+    用于 UI 显示供用户选择
+
+    Returns:
+        候选路径列表（已过滤存在的路径）
+    """
+    candidates = _find_media_crawler_paths()
+    # 去重并保持顺序
+    seen = set()
+    unique = []
+    for p in candidates:
+        resolved = p.resolve()
+        if resolved not in seen and resolved.exists() and resolved.is_dir():
+            seen.add(resolved)
+            unique.append(resolved)
+    return unique
