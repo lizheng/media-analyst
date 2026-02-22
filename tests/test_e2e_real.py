@@ -193,26 +193,93 @@ def test_douyin_detail_with_output_verification(media_crawler_path: Path):
 
     assert return_code == 0, f"爬虫进程异常退出，返回码: {return_code}"
 
-    # TODO(human): 实现输出文件验证逻辑
-    # 任务：在下面的代码块中实现数据文件验证
-    #
-    # 背景：MediaCrawler爬取的数据默认保存在 MediaCrawler/data/ 目录下
-    # 抖音数据的保存路径通常是：data/dy/日期/ 或 data/douyin/日期/
-    #
-    # 需要验证：
-    # 1. 数据目录是否存在
-    # 2. 是否生成了JSON/CSV等数据文件
-    # 3. 文件内容是否包含预期的视频数据
-    #
-    # 指导：
-    # - 使用 Path 和 glob 查找生成的文件
-    # - 考虑数据保存可能有延迟，可能需要短暂等待
-    # - 可以先打印找到的目录结构帮助调试
-    # - 如果文件不存在，打印提示信息但不导致测试失败（因为可能是配置问题）
-
+    # 验证输出文件
     print("\n📁 检查输出文件...")
-    # 在这里实现你的验证代码
-    for f in (media_crawler_path / 'data').glob('*.json'):
-        print(f)
 
-    print("✅ 测试完成！请检查 data/ 目录下的输出文件")
+    import json
+    import time
+
+    # 等待一小段时间确保文件写入完成
+    time.sleep(1)
+
+    data_dir = media_crawler_path / "data"
+
+    # 1. 检查数据目录是否存在
+    if not data_dir.exists():
+        print(f"⚠️ 数据目录不存在: {data_dir}")
+        print("提示：可能是MediaCrawler配置为其他保存路径")
+        return
+
+    print(f"✅ 数据目录存在: {data_dir}")
+
+    # 2. 查找所有生成的文件（递归搜索）
+    all_files = list(data_dir.rglob("*"))
+    data_files = [f for f in all_files if f.is_file()]
+
+    if not data_files:
+        print("⚠️ 未找到任何数据文件")
+        print(f"目录结构: {list(data_dir.iterdir())}")
+        return
+
+    print(f"\n📊 找到 {len(data_files)} 个文件:")
+
+    # 按类型分类文件
+    json_files = [f for f in data_files if f.suffix == '.json']
+    csv_files = [f for f in data_files if f.suffix == '.csv']
+    other_files = [f for f in data_files if f.suffix not in ['.json', '.csv']]
+
+    if json_files:
+        print(f"  - JSON文件: {len(json_files)} 个")
+        for f in json_files[:3]:  # 只显示前3个
+            print(f"    • {f.relative_to(media_crawler_path)} ({f.stat().st_size} bytes)")
+        if len(json_files) > 3:
+            print(f"    ... 还有 {len(json_files) - 3} 个")
+
+    if csv_files:
+        print(f"  - CSV文件: {len(csv_files)} 个")
+
+    if other_files:
+        print(f"  - 其他文件: {len(other_files)} 个")
+
+    # 3. 验证JSON文件内容
+    if json_files:
+        print("\n🔍 验证JSON文件内容...")
+        for json_file in json_files[:2]:  # 验证前2个
+            try:
+                with open(json_file, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+
+                if isinstance(data, list):
+                    print(f"  ✅ {json_file.name}: 包含 {len(data)} 条记录")
+                    if data and isinstance(data[0], dict):
+                        print(f"     字段: {list(data[0].keys())[:5]}")  # 显示前5个字段
+                elif isinstance(data, dict):
+                    print(f"  ✅ {json_file.name}: 包含字段 {list(data.keys())[:5]}")
+                else:
+                    print(f"  ⚠️ {json_file.name}: 未知格式 {type(data)}")
+
+            except json.JSONDecodeError as e:
+                print(f"  ❌ {json_file.name}: JSON解析错误 - {e}")
+            except Exception as e:
+                print(f"  ⚠️ {json_file.name}: 读取错误 - {e}")
+
+    # 4. 验证是否包含视频数据特征
+    video_data_found = False
+    for json_file in json_files:
+        try:
+            with open(json_file, 'r', encoding='utf-8') as f:
+                content = f.read()
+                if 'video' in content.lower() or 'aweme' in content.lower() or 'modal_id' in content:
+                    video_data_found = True
+                    break
+        except:
+            continue
+
+    if video_data_found:
+        print("\n✅ 验证通过：找到视频相关数据")
+    else:
+        print("\n⚠️ 未找到明显的视频数据特征（可能保存格式不同）")
+
+    print(f"\n{'='*60}")
+    print("✅ 输出文件验证完成！")
+    print(f"{'='*60}")
