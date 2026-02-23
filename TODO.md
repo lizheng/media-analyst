@@ -1,7 +1,6 @@
 * 速度问题
 * 任务化、管道化
-* 覆盖率
-* prek
+* URL文本输入增加提交按钮，URL列表可编辑
 
 
 
@@ -21,3 +20,5 @@ https://www.douyin.com/jingxuan?modal_id=7605333789232876826,https://v.douyin.co
 * url智能识别问题
 * FCIS
 * 保存界面上次选择
+* 覆盖率
+* prek
